@@ -45,7 +45,18 @@ public final class StructureScoreboard extends JavaPlugin implements Listener, C
 
     @Override
     public void onEnable() {
-        saveDefaultConfig();
+                getConfig().addDefault("title", "&b&lStructure Smp");
+        getConfig().addDefault("update-ticks", 20);
+        getConfig().addDefault("lines", java.util.Arrays.asList(
+                "&7&m                    ",
+                "&eเงิน: &f$%money%",
+                "&cคิล: &f%kills% &7(K/D %kd%)",
+                "&4ตาย: &f%deaths%",
+                "&aเวลาเล่น: &f%playtime%",
+                "&dปิง: %ping%",
+                "&7&m                    "));
+        getConfig().options().copyDefaults(true);
+        saveConfig();
         vaultPresent = getServer().getPluginManager().getPlugin("Vault") != null;
         getServer().getPluginManager().registerEvents(this, this);
         getCommand("sb").setExecutor(this);
