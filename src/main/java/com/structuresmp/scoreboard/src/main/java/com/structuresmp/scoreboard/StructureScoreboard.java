@@ -57,6 +57,8 @@ public final class StructureScoreboard extends JavaPlugin implements Listener, C
     private AuctionGui auctionGui;
     private OrderGui orderGui;
     private RandomTeleport rtp;
+    private CombatManager combat;
+    private MovementEffects effects;
 
     private BukkitTask task;
     private BukkitTask titleTask;
@@ -94,6 +96,14 @@ public final class StructureScoreboard extends JavaPlugin implements Listener, C
         getConfig().addDefault("ah.tax-percent", 5);
         getConfig().addDefault("orders.max-orders", 5);
         getConfig().addDefault("orders.max-amount", 2304);
+        getConfig().addDefault("combat.enabled", true);
+        getConfig().addDefault("combat.seconds", 20);
+        getConfig().addDefault("combat.kill-on-quit", true);
+        getConfig().addDefault("combat.blocked-commands", java.util.Arrays.asList(
+                "rtp", "wild", "spawn", "home", "homes", "tpa", "tpahere", "tpaccept", "warp", "back", "tp"));
+        getConfig().addDefault("effects.enabled", true);
+        getConfig().addDefault("effects.walk", true);
+        getConfig().addDefault("effects.sprint", true);
         getConfig().options().copyDefaults(true);
 
         // one-time switch of the scoreboard lines to the purple theme (with points)
@@ -110,6 +120,8 @@ public final class StructureScoreboard extends JavaPlugin implements Listener, C
         auctions = new AuctionManager(this);
         orders = new OrderManager(this);
         rtp = new RandomTeleport(this);
+        combat = new CombatManager(this);
+        effects = new MovementEffects(this);
         shopGui = new ShopGui(this, economy, prices);
         sellGui = new SellGui(this, economy, prices);
         auctionGui = new AuctionGui(this, economy, auctions);
@@ -127,6 +139,7 @@ public final class StructureScoreboard extends JavaPlugin implements Listener, C
         getServer().getPluginManager().registerEvents(sellGui, this);
         getServer().getPluginManager().registerEvents(auctionGui, this);
         getServer().getPluginManager().registerEvents(orderGui, this);
+        getServer().getPluginManager().registerEvents(combat, this);
 
         loadSettings();
         Bukkit.getScheduler().runTaskTimer(this, () -> {
@@ -138,6 +151,8 @@ public final class StructureScoreboard extends JavaPlugin implements Listener, C
     @Override
     public void onDisable() {
         if (sellGui != null) sellGui.closeAll(); // gives items back to players
+        if (combat != null) combat.stop();
+        if (effects != null) effects.stop();
         if (task != null) task.cancel();
         if (titleTask != null) titleTask.cancel();
         for (Player p : Bukkit.getOnlinePlayers()) remove(p);
@@ -151,6 +166,8 @@ public final class StructureScoreboard extends JavaPlugin implements Listener, C
         economy.setStartingBalance(getConfig().getDouble("starting-balance", 1000));
         prices.load();
         rtp.reload();
+        combat.reload();
+        effects.reload();
 
         title = getConfig().getString("title", "&d&lStructure Smp");
         lines = getConfig().getStringList("lines");

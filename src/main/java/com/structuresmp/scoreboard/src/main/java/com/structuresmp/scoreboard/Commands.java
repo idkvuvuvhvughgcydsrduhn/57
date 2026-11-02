@@ -46,6 +46,10 @@ public final class Commands implements TabExecutor {
             case "bal" -> cmdBal(sender, args);
             case "pay" -> cmdPay(sender, args);
             case "points" -> cmdPoints(sender, args);
+            case "addmoney" -> cmdMoney(sender, args, true);
+            case "removemoney" -> cmdMoney(sender, args, false);
+            case "addpoint" -> cmdPointAdmin(sender, args, true);
+            case "removepoint" -> cmdPointAdmin(sender, args, false);
             case "baltop" -> cmdBaltop(sender);
             case "worth" -> cmdWorth(sender, args);
             case "sell" -> cmdSell(sender, args);
@@ -66,6 +70,9 @@ public final class Commands implements TabExecutor {
         if (name.equals("worth") && args.length == 1) return List.of("hand");
         if (name.equals("sell") && args.length == 1) return List.of("hand", "all");
         if ((name.equals("bal") || name.equals("pay")) && args.length == 1) return null; // online player names
+        if (List.of("addmoney", "removemoney", "addpoint", "removepoint").contains(name)) {
+            return args.length == 1 ? null : List.of(); // online player names
+        }
         if (name.equals("points")) {
             if (args.length == 1) {
                 if (!sender.hasPermission("structuresmp.admin")) return null; // player names
@@ -225,6 +232,90 @@ public final class Commands implements TabExecutor {
         }
         sender.sendMessage(Text.c("&dพ้อยของ &f" + economy.nameOf(id) + "&d: &f"
                 + PointsManager.format(points.get(id))));
+    }
+
+    /** /addmoney and /removemoney <player> <amount> - OP only. Amounts accept 500, 2.5k, 1m. */
+    private void cmdMoney(CommandSender sender, String[] args, boolean add) {
+        if (!sender.hasPermission("structuresmp.admin")) {
+            sender.sendMessage(Text.c("&cคุณไม่มีสิทธิ์ใช้คำสั่งนี้ (เฉพาะ OP)"));
+            return;
+        }
+        String cmd = add ? "addmoney" : "removemoney";
+        if (args.length < 2) {
+            sender.sendMessage(Text.c("&eใช้: &f/" + cmd + " <ผู้เล่น> <จำนวนเงิน>"));
+            return;
+        }
+        UUID target = resolve(args[0]);
+        if (target == null) {
+            sender.sendMessage(Text.c("&cไม่พบผู้เล่นชื่อ " + args[0]));
+            return;
+        }
+        double amount = Text.parseAmount(args[1]);
+        if (amount < 0.01 || amount > 1_000_000_000_000_000d) {
+            sender.sendMessage(Text.c("&cจำนวนเงินไม่ถูกต้อง (พิมพ์เช่น 500, 2.5k, 1m)"));
+            return;
+        }
+
+        String name = economy.nameOf(target);
+        Player online = Bukkit.getPlayer(target);
+        if (add) {
+            economy.add(target, amount);
+            sender.sendMessage(Text.c("&aเพิ่มเงินให้ &f" + name + " &e$" + Text.money(amount)
+                    + " &7(ตอนนี้ $" + Text.money(economy.get(target)) + ")"));
+            if (online != null) online.sendMessage(Text.c("&aคุณได้รับเงิน &e$" + Text.money(amount)));
+        } else {
+            double current = economy.get(target);
+            double removed = Math.min(current, amount);
+            economy.set(target, current - removed);
+            sender.sendMessage(Text.c("&aลบเงินของ &f" + name + " &e$" + Text.money(removed)
+                    + " &7(ตอนนี้ $" + Text.money(economy.get(target)) + ")"));
+            if (online != null) online.sendMessage(Text.c("&cเงินของคุณถูกหัก &e$" + Text.money(removed)));
+        }
+        economy.save();
+    }
+
+    /** /addpoint and /removepoint <player> <amount> - OP only. */
+    private void cmdPointAdmin(CommandSender sender, String[] args, boolean add) {
+        if (!sender.hasPermission("structuresmp.admin")) {
+            sender.sendMessage(Text.c("&cคุณไม่มีสิทธิ์ใช้คำสั่งนี้ (เฉพาะ OP)"));
+            return;
+        }
+        String cmd = add ? "addpoint" : "removepoint";
+        if (args.length < 2) {
+            sender.sendMessage(Text.c("&eใช้: &f/" + cmd + " <ผู้เล่น> <จำนวนพ้อย>"));
+            return;
+        }
+        UUID target = resolve(args[0]);
+        if (target == null) {
+            sender.sendMessage(Text.c("&cไม่พบผู้เล่นชื่อ " + args[0]));
+            return;
+        }
+        double parsed = Text.parseAmount(args[1]);
+        if (parsed < 1 || parsed > 1_000_000_000_000_000d) {
+            sender.sendMessage(Text.c("&cจำนวนพ้อยไม่ถูกต้อง (ตัวเลขตั้งแต่ 1 ขึ้นไป)"));
+            return;
+        }
+        long amount = Math.round(parsed);
+
+        String name = economy.nameOf(target);
+        Player online = Bukkit.getPlayer(target);
+        if (add) {
+            points.add(target, amount);
+            sender.sendMessage(Text.c("&aเพิ่มพ้อยให้ &f" + name + " &d" + PointsManager.format(amount)
+                    + " &7(ตอนนี้ " + PointsManager.format(points.get(target)) + ")"));
+            if (online != null) {
+                online.sendMessage(Text.c("&dคุณได้รับ &f" + PointsManager.format(amount) + " &dพ้อย"));
+            }
+        } else {
+            long removed = Math.min(points.get(target), amount);
+            points.set(target, points.get(target) - removed);
+            sender.sendMessage(Text.c("&aลบพ้อยของ &f" + name + " &d" + PointsManager.format(removed)
+                    + " &7(ตอนนี้ " + PointsManager.format(points.get(target)) + ")"));
+            if (online != null) {
+                online.sendMessage(Text.c("&cพ้อยของคุณถูกหัก &f" + PointsManager.format(removed)));
+            }
+        }
+        points.save();
     }
 
     private void cmdBaltop(CommandSender sender) {
