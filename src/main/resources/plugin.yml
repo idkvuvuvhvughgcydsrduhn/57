@@ -1,5 +1,5 @@
 name: StructureScoreboard
-version: 1.4.0
+version: 1.5.0
 main: com.structuresmp.scoreboard.StructureScoreboard
 api-version: "1.21"
 description: Scoreboard, economy, shop, auction house, orders and RTP for Structure Smp
@@ -18,6 +18,24 @@ commands:
     description: View or manage points
     usage: /points [player] | /points <give|take|set> <player> <amount>
     aliases: [point, pts]
+  addmoney:
+    description: Add money to a player (OP only)
+    usage: /addmoney <player> <amount>
+    permission: structuresmp.admin
+  removemoney:
+    description: Remove money from a player (OP only)
+    usage: /removemoney <player> <amount>
+    permission: structuresmp.admin
+  addpoint:
+    description: Add points to a player (OP only)
+    usage: /addpoint <player> <amount>
+    aliases: [addpoints]
+    permission: structuresmp.admin
+  removepoint:
+    description: Remove points from a player (OP only)
+    usage: /removepoint <player> <amount>
+    aliases: [removepoints]
+    permission: structuresmp.admin
   baltop:
     description: Richest players
     usage: /baltop
