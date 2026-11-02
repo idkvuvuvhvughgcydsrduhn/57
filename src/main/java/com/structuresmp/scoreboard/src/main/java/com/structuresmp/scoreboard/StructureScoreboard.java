@@ -128,7 +128,8 @@ public final class StructureScoreboard extends JavaPlugin implements Listener, C
         orderGui = new OrderGui(this, economy, orders);
 
         Commands commands = new Commands(economy, points, prices, shopGui, sellGui, auctionGui, orderGui, rtp);
-        for (String name : new String[] {"bal", "pay", "points", "baltop", "worth", "sell", "shop", "rtp", "ah", "orders"}) {
+        for (String name : new String[] {"bal", "pay", "points", "addmoney", "removemoney", "addpoint", "removepoint",
+                "baltop", "worth", "sell", "shop", "rtp", "ah", "orders"}) {
             PluginCommand pc = getCommand(name);
             if (pc != null) pc.setExecutor(commands);
         }
@@ -307,6 +308,8 @@ public final class StructureScoreboard extends JavaPlugin implements Listener, C
 
     @Override
     public boolean onCommand(CommandSender sender, Command cmd, String label, String[] args) {
+        // this class only handles /sb; any command without its own executor must never toggle the scoreboard
+        if (!cmd.getName().equalsIgnoreCase("sb")) return false;
         if (args.length > 0 && args[0].equalsIgnoreCase("reload")) {
             if (!sender.hasPermission("structuresmp.admin")) {
                 sender.sendMessage(Component.text("คุณไม่มีสิทธิ์ใช้คำสั่งนี้", NamedTextColor.RED));
