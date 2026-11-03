@@ -3,11 +3,15 @@ package com.structuresmp.scoreboard;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.Material;
+import org.bukkit.Tag;
+import org.bukkit.World;
 import org.bukkit.block.Block;
 import org.bukkit.entity.EnderCrystal;
 import org.bukkit.entity.Entity;
+import org.bukkit.entity.LivingEntity;
 import org.bukkit.entity.Player;
 import org.bukkit.entity.Projectile;
+import org.bukkit.entity.TNTPrimed;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
@@ -15,10 +19,13 @@ import org.bukkit.event.block.Action;
 import org.bukkit.event.entity.EntityDamageByEntityEvent;
 import org.bukkit.event.entity.EntityDamageEvent;
 import org.bukkit.event.entity.PlayerDeathEvent;
+import org.bukkit.event.entity.PotionSplashEvent;
 import org.bukkit.event.player.PlayerCommandPreprocessEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.plugin.java.JavaPlugin;
+import org.bukkit.potion.PotionEffect;
+import org.bukkit.potion.PotionEffectType;
 import org.bukkit.scheduler.BukkitTask;
 
 import java.util.HashMap;
@@ -30,11 +37,16 @@ import java.util.Set;
 import java.util.UUID;
 
 /**
- * PvP combat tag. A player hit by another PLAYER (any melee item or fist, arrow/trident,
- * end crystal, respawn anchor) is tagged for combat.seconds. Mobs never tag anyone.
- * Both the attacker and the victim are tagged.
+ * Combat tag. A player who takes damage caused by another PLAYER, by any means (melee with any
+ * item or fist, arrows, tridents, TNT, end crystals, respawn anchors, beds, harmful potions),
+ * is tagged for combat.seconds. The attacker is tagged too (combat.tag-attacker).
+ * Mobs do not tag anyone unless combat.tag-from-mobs is true.
+ * The timer is shown as small purple text on the action bar.
  */
 public final class CombatManager implements Listener {
+
+    private static final String PURPLE = "&#A855F7";
+    private static final String LIGHT_PURPLE = "&#D8B4FE";
 
     private record CrystalHit(UUID player, long time) {
     }
@@ -45,16 +57,22 @@ public final class CombatManager implements Listener {
     private Set<String> blocked = new HashSet<>();
     private BukkitTask task;
 
-    // last respawn anchor a player right-clicked (anchors explode when used outside the Nether)
-    private UUID anchorPlayer;
-    private Location anchorLoc;
-    private long anchorTime;
+    // last respawn anchor / bed a player clicked (they explode in the wrong dimension)
+    private UUID blastPlayer;
+    private Location blastLoc;
+    private long blastTime;
 
     public CombatManager(JavaPlugin plugin) {
         this.plugin = plugin;
     }
 
     public void reload() {
+        // make sure the newer options exist in config.yml
+        plugin.getConfig().addDefault("combat.tag-attacker", true);
+        plugin.getConfig().addDefault("combat.tag-from-mobs", false);
+        plugin.getConfig().options().copyDefaults(true);
+        plugin.saveConfig();
+
         blocked = new HashSet<>();
         for (String s : plugin.getConfig().getStringList("combat.blocked-commands")) {
             blocked.add(s.toLowerCase(Locale.ROOT));
@@ -91,16 +109,23 @@ public final class CombatManager implements Listener {
         return Math.max(0, (until - System.currentTimeMillis() + 999) / 1000);
     }
 
-    private void tag(Player p) {
-        boolean first = !isInCombat(p);
-        combat.put(p.getUniqueId(), System.currentTimeMillis() + seconds() * 1000L);
-        if (first) {
-            p.sendMessage(Text.c("&c&l[COMBAT] &cคุณเข้าสู่โหมด Combat " + seconds()
-                    + " วินาที &7(ออกเกมตอนนี้ = ตาย)"));
-        }
+    /** Small purple text on the action bar. */
+    private void showTimer(Player p, long seconds) {
+        p.sendActionBar(Text.c(PURPLE + "Combat " + LIGHT_PURPLE + seconds + "s"));
     }
 
-    /** Once a second: show the countdown and release players whose time is up. */
+    private void tag(Player p) {
+        combat.put(p.getUniqueId(), System.currentTimeMillis() + seconds() * 1000L);
+        showTimer(p, seconds());
+    }
+
+    private void tagPair(Player attacker, Player victim) {
+        if (attacker == null || victim == null || attacker.equals(victim)) return;
+        tag(victim);
+        if (plugin.getConfig().getBoolean("combat.tag-attacker", true)) tag(attacker);
+    }
+
+    /** Once a second: update the countdown and release players whose time is up. */
     private void tick() {
         long now = System.currentTimeMillis();
 
@@ -115,21 +140,30 @@ public final class CombatManager implements Listener {
             long left = e.getValue() - now;
             if (left <= 0) {
                 it.remove();
-                p.sendActionBar(Text.c("&a&l[COMBAT] &aออกจากโหมด Combat แล้ว"));
-                p.sendMessage(Text.c("&aคุณออกจากโหมด Combat แล้ว"));
+                p.sendActionBar(Text.c(PURPLE + "ออกจาก Combat แล้ว"));
             } else {
-                p.sendActionBar(Text.c("&c&l[COMBAT] &f" + ((left + 999) / 1000) + " วินาที"));
+                showTimer(p, (left + 999) / 1000);
             }
         }
 
         crystals.values().removeIf(hit -> now - hit.time() > 15_000L);
     }
 
-    /** The player behind a damage source: the player himself, or the shooter of an arrow/trident. */
+    /** The player behind a damage source: the player, the shooter of an arrow/trident/etc., or who lit the TNT. */
     private static Player playerFrom(Entity damager) {
         if (damager instanceof Player p) return p;
         if (damager instanceof Projectile proj && proj.getShooter() instanceof Player p) return p;
+        if (damager instanceof TNTPrimed tnt && tnt.getSource() instanceof Player p) return p;
         return null;
+    }
+
+    /** True when the damage comes from a mob (or a mob's arrow). */
+    private static boolean fromMob(Entity damager) {
+        if (damager instanceof Player) return false;
+        if (damager instanceof LivingEntity) return true;
+        return damager instanceof Projectile proj
+                && proj.getShooter() instanceof LivingEntity shooter
+                && !(shooter instanceof Player);
     }
 
     @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
@@ -161,37 +195,63 @@ public final class CombatManager implements Listener {
             CrystalHit hit = crystals.get(crystal.getUniqueId());
             attacker = hit == null ? null : Bukkit.getPlayer(hit.player());
         } else {
-            attacker = playerFrom(damager); // mobs (and mob arrows) give null
+            attacker = playerFrom(damager);
         }
-        if (attacker == null || attacker.equals(target)) return;
 
-        tag(attacker);
-        tag(target);
+        if (attacker != null) {
+            tagPair(attacker, target);
+        } else if (fromMob(damager) && plugin.getConfig().getBoolean("combat.tag-from-mobs", false)) {
+            tag(target);
+        }
+    }
+
+    /** Harmful splash potions (instant damage, poison, wither) thrown by a player. */
+    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
+    public void onSplash(PotionSplashEvent e) {
+        if (!enabled()) return;
+        if (!(e.getPotion().getShooter() instanceof Player thrower)) return;
+
+        boolean harmful = false;
+        for (PotionEffect fx : e.getPotion().getEffects()) {
+            PotionEffectType type = fx.getType();
+            if (type.equals(PotionEffectType.INSTANT_DAMAGE)
+                    || type.equals(PotionEffectType.POISON)
+                    || type.equals(PotionEffectType.WITHER)) {
+                harmful = true;
+            }
+        }
+        if (!harmful) return;
+
+        for (LivingEntity hit : e.getAffectedEntities()) {
+            if (hit instanceof Player target && e.getIntensity(hit) > 0) {
+                tagPair(thrower, target);
+            }
+        }
     }
 
     @EventHandler(priority = EventPriority.MONITOR)
     public void onInteract(PlayerInteractEvent e) {
         if (e.getAction() != Action.RIGHT_CLICK_BLOCK) return;
         Block b = e.getClickedBlock();
-        if (b == null || b.getType() != Material.RESPAWN_ANCHOR) return;
-        anchorPlayer = e.getPlayer().getUniqueId();
-        anchorLoc = b.getLocation().add(0.5, 0.5, 0.5);
-        anchorTime = System.currentTimeMillis();
+        if (b == null) return;
+        boolean anchor = b.getType() == Material.RESPAWN_ANCHOR;
+        boolean bed = Tag.BEDS.isTagged(b.getType()) && b.getWorld().getEnvironment() != World.Environment.NORMAL;
+        if (!anchor && !bed) return;
+        blastPlayer = e.getPlayer().getUniqueId();
+        blastLoc = b.getLocation().add(0.5, 0.5, 0.5);
+        blastTime = System.currentTimeMillis();
     }
 
-    /** Respawn anchor explosions: damage right after a player clicked an anchor close by. */
+    /** Anchor and bed explosions: damage right after a player clicked one close by. */
     @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
     public void onBlockExplosion(EntityDamageEvent e) {
         if (!enabled() || e.getCause() != EntityDamageEvent.DamageCause.BLOCK_EXPLOSION) return;
-        if (!(e.getEntity() instanceof Player target) || anchorPlayer == null || anchorLoc == null) return;
-        if (System.currentTimeMillis() - anchorTime > 1500L) return;
-        if (!target.getWorld().equals(anchorLoc.getWorld())) return;
-        if (target.getLocation().distanceSquared(anchorLoc) > 100) return;
+        if (!(e.getEntity() instanceof Player target) || blastPlayer == null || blastLoc == null) return;
+        if (System.currentTimeMillis() - blastTime > 1500L) return;
+        if (!target.getWorld().equals(blastLoc.getWorld())) return;
+        if (target.getLocation().distanceSquared(blastLoc) > 100) return;
 
-        Player attacker = Bukkit.getPlayer(anchorPlayer);
-        if (attacker == null || attacker.equals(target)) return;
-        tag(attacker);
-        tag(target);
+        tagPair(Bukkit.getPlayer(blastPlayer), target);
     }
 
     @EventHandler
@@ -226,7 +286,7 @@ public final class CombatManager implements Listener {
 
         if (blocked.contains(label)) {
             e.setCancelled(true);
-            p.sendMessage(Text.c("&cใช้คำสั่งนี้ไม่ได้ขณะ Combat (เหลืออีก " + secondsLeft(p) + " วินาที)"));
+            p.sendMessage(Text.c(PURPLE + "ใช้คำสั่งนี้ไม่ได้ขณะ Combat (เหลืออีก " + secondsLeft(p) + " วินาที)"));
         }
     }
 }
