@@ -1,5 +1,5 @@
 name: StructureScoreboard
-version: 1.5.0
+version: 1.6.0
 main: com.structuresmp.scoreboard.StructureScoreboard
 api-version: "1.21"
 description: Scoreboard, economy, shop, auction house, orders and RTP for Structure Smp
@@ -36,6 +36,9 @@ commands:
     usage: /removepoint <player> <amount>
     aliases: [removepoints]
     permission: structuresmp.admin
+  hammer:
+    description: Give the 3x3 Hammer (OP) or re-send the resource pack
+    usage: /hammer [player] | /hammer pack
   baltop:
     description: Richest players
     usage: /baltop
