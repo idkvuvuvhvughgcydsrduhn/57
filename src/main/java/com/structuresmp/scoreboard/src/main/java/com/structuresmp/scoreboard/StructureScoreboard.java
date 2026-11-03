@@ -59,6 +59,7 @@ public final class StructureScoreboard extends JavaPlugin implements Listener, C
     private RandomTeleport rtp;
     private CombatManager combat;
     private MovementEffects effects;
+    private HammerManager hammer;
 
     private BukkitTask task;
     private BukkitTask titleTask;
@@ -122,6 +123,7 @@ public final class StructureScoreboard extends JavaPlugin implements Listener, C
         rtp = new RandomTeleport(this);
         combat = new CombatManager(this);
         effects = new MovementEffects(this);
+        hammer = new HammerManager(this);
         shopGui = new ShopGui(this, economy, prices);
         sellGui = new SellGui(this, economy, prices);
         auctionGui = new AuctionGui(this, economy, auctions);
@@ -134,6 +136,7 @@ public final class StructureScoreboard extends JavaPlugin implements Listener, C
             if (pc != null) pc.setExecutor(commands);
         }
         getCommand("sb").setExecutor(this);
+        getCommand("hammer").setExecutor(hammer);
 
         getServer().getPluginManager().registerEvents(this, this);
         getServer().getPluginManager().registerEvents(shopGui, this);
@@ -141,6 +144,7 @@ public final class StructureScoreboard extends JavaPlugin implements Listener, C
         getServer().getPluginManager().registerEvents(auctionGui, this);
         getServer().getPluginManager().registerEvents(orderGui, this);
         getServer().getPluginManager().registerEvents(combat, this);
+        getServer().getPluginManager().registerEvents(hammer, this);
 
         loadSettings();
         Bukkit.getScheduler().runTaskTimer(this, () -> {
@@ -169,6 +173,7 @@ public final class StructureScoreboard extends JavaPlugin implements Listener, C
         rtp.reload();
         combat.reload();
         effects.reload();
+        hammer.reload();
 
         title = getConfig().getString("title", "&d&lStructure Smp");
         lines = getConfig().getStringList("lines");
