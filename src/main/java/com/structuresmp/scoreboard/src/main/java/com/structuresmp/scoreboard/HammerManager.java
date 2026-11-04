@@ -43,6 +43,14 @@ public final class HammerManager implements Listener, CommandExecutor {
     private static final UUID PACK_ID = UUID.nameUUIDFromBytes("structuresmp-hammer-pack".getBytes());
     private static final String PURPLE = "&#A855F7";
 
+    // resource pack v2 = 64x64 netherite pickaxe model (file StructureHammerPack2.zip in the repo root)
+    private static final int PACK_VERSION = 2;
+    private static final String OLD_PACK_URL =
+            "https://github.com/idkvuvuvhvughgcydsrduhn/57/raw/main/StructureHammerPack.zip";
+    private static final String PACK_URL =
+            "https://github.com/idkvuvuvhvughgcydsrduhn/57/raw/main/StructureHammerPack2.zip";
+    private static final String PACK_SHA1 = "5b7d9869a5931312c2b4a981d69d968e17fc85a9";
+
     private static final Set<Material> NEVER_BREAK = EnumSet.of(
             Material.BEDROCK, Material.BARRIER, Material.SPAWNER, Material.TRIAL_SPAWNER, Material.VAULT,
             Material.REINFORCED_DEEPSLATE, Material.END_PORTAL_FRAME, Material.COMMAND_BLOCK,
@@ -64,10 +72,20 @@ public final class HammerManager implements Listener, CommandExecutor {
     }
 
     public void reload() {
+        // new pack version: refresh the stored hash once (and the url, unless it was customised)
+        var cfg = plugin.getConfig();
+        if (cfg.getInt("hammer.resource-pack.version", 1) < PACK_VERSION) {
+            String url = cfg.getString("hammer.resource-pack.url", "");
+            if (url == null || url.isBlank() || url.equals(OLD_PACK_URL)) {
+                cfg.set("hammer.resource-pack.url", PACK_URL);
+            }
+            cfg.set("hammer.resource-pack.sha1", PACK_SHA1);
+            cfg.set("hammer.resource-pack.version", PACK_VERSION);
+        }
+
         plugin.getConfig().addDefault("hammer.resource-pack.enabled", true);
-        plugin.getConfig().addDefault("hammer.resource-pack.url",
-                "https://github.com/idkvuvuvhvughgcydsrduhn/57/raw/main/StructureHammerPack.zip");
-        plugin.getConfig().addDefault("hammer.resource-pack.sha1", "fbc310c157c47b8f1943cf336a7ba38589977b11");
+        plugin.getConfig().addDefault("hammer.resource-pack.url", PACK_URL);
+        plugin.getConfig().addDefault("hammer.resource-pack.sha1", PACK_SHA1);
         plugin.getConfig().addDefault("hammer.resource-pack.required", false);
         plugin.getConfig().options().copyDefaults(true);
         plugin.saveConfig();
@@ -97,7 +115,7 @@ public final class HammerManager implements Listener, CommandExecutor {
     public ItemStack createHammer() {
         ItemStack item = new ItemStack(Material.NETHERITE_PICKAXE);
         ItemMeta meta = item.getItemMeta();
-        meta.displayName(Text.lore("&#C77DFF&lHammer 3x3"));
+        meta.displayName(Text.lore("&#C77DFF&lNetherite Pickaxe 3x3"));
         List<Component> lore = new ArrayList<>();
         lore.add(Text.lore("&7ขุดครั้งเดียวได้ 3x3 บล็อก (ลึก 1 บล็อก)"));
         lore.add(Text.lore("&8กด Shift ค้างไว้เพื่อขุดทีละบล็อก"));
