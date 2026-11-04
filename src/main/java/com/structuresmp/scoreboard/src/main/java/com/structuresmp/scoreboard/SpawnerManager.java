@@ -1,0 +1,447 @@
+package com.structuresmp.scoreboard;
+
+import org.bukkit.Bukkit;
+import org.bukkit.Material;
+import org.bukkit.NamespacedKey;
+import org.bukkit.World;
+import org.bukkit.block.Block;
+import org.bukkit.block.CreatureSpawner;
+import org.bukkit.configuration.ConfigurationSection;
+import org.bukkit.configuration.file.YamlConfiguration;
+import org.bukkit.entity.EntityType;
+import org.bukkit.entity.Player;
+import org.bukkit.event.EventHandler;
+import org.bukkit.event.EventPriority;
+import org.bukkit.event.Listener;
+import org.bukkit.event.block.Action;
+import org.bukkit.event.block.BlockBreakEvent;
+import org.bukkit.event.block.BlockExplodeEvent;
+import org.bukkit.event.block.BlockPlaceEvent;
+import org.bukkit.event.entity.EntityExplodeEvent;
+import org.bukkit.event.entity.SpawnerSpawnEvent;
+import org.bukkit.event.player.PlayerInteractEvent;
+import org.bukkit.inventory.EquipmentSlot;
+import org.bukkit.inventory.ItemStack;
+import org.bukkit.inventory.meta.BlockStateMeta;
+import org.bukkit.inventory.meta.ItemMeta;
+import org.bukkit.persistence.PersistentDataType;
+import org.bukkit.plugin.java.JavaPlugin;
+import org.bukkit.scheduler.BukkitTask;
+
+import java.io.File;
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.Iterator;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.Set;
+import java.util.UUID;
+import java.util.concurrent.ThreadLocalRandom;
+
+/**
+ * Click-to-open spawner cages. A placed spawner does not spawn mobs; it produces the mob's drops
+ * and XP on its own, stored inside it. The owner opens a menu (right click) to collect XP, view
+ * the production, sell everything, or throw it away. Data: plugins/StructureScoreboard/spawners.yml
+ */
+public final class SpawnerManager implements Listener {
+
+    public static final class SpawnerData {
+        public final String world;
+        public final int x, y, z;
+        public final EntityType type;
+        public final UUID owner;
+        public final String ownerName;
+        public long xp;
+        public long mobs;
+        public long produced;
+        public final Map<Material, Long> storage = new LinkedHashMap<>();
+
+        SpawnerData(String world, int x, int y, int z, EntityType type, UUID owner, String ownerName) {
+            this.world = world;
+            this.x = x;
+            this.y = y;
+            this.z = z;
+            this.type = type;
+            this.owner = owner;
+            this.ownerName = ownerName;
+        }
+
+        public String key() {
+            return world + ";" + x + ";" + y + ";" + z;
+        }
+
+        public long stored() {
+            long n = 0;
+            for (long v : storage.values()) n += v;
+            return n;
+        }
+    }
+
+    private record Drop(Material item, int min, int max, double chance) {
+    }
+
+    /** rate = how many mobs per cycle compared with the base value (passive animals are slower). */
+    private record Table(double rate, int xp, List<Drop> drops) {
+    }
+
+    private static final Map<EntityType, Table> TABLES = new LinkedHashMap<>();
+
+    private static Drop d(Material m, int min, int max, double chance) {
+        return new Drop(m, min, max, chance);
+    }
+
+    static {
+        TABLES.put(EntityType.PIG, new Table(0.5, 2, List.of(d(Material.PORKCHOP, 1, 3, 1.0))));
+        TABLES.put(EntityType.COW, new Table(0.5, 2, List.of(d(Material.LEATHER, 0, 2, 1.0), d(Material.BEEF, 1, 3, 1.0))));
+        TABLES.put(EntityType.CHICKEN, new Table(0.5, 2, List.of(d(Material.FEATHER, 0, 2, 1.0),
+                d(Material.CHICKEN, 1, 1, 1.0), d(Material.EGG, 1, 1, 0.3))));
+        TABLES.put(EntityType.SHEEP, new Table(0.5, 2, List.of(d(Material.MUTTON, 1, 2, 1.0), d(Material.WHITE_WOOL, 1, 1, 1.0))));
+        TABLES.put(EntityType.ZOMBIE, new Table(1.0, 5, List.of(d(Material.ROTTEN_FLESH, 0, 2, 1.0),
+                d(Material.IRON_INGOT, 1, 1, 0.025), d(Material.CARROT, 1, 1, 0.025), d(Material.POTATO, 1, 1, 0.025))));
+        TABLES.put(EntityType.SKELETON, new Table(1.0, 5, List.of(d(Material.BONE, 0, 2, 1.0), d(Material.ARROW, 0, 2, 1.0))));
+        TABLES.put(EntityType.SPIDER, new Table(1.0, 5, List.of(d(Material.STRING, 0, 2, 1.0), d(Material.SPIDER_EYE, 1, 1, 0.33))));
+        TABLES.put(EntityType.CAVE_SPIDER, new Table(1.0, 5, List.of(d(Material.STRING, 0, 2, 1.0), d(Material.SPIDER_EYE, 1, 1, 0.33))));
+        TABLES.put(EntityType.CREEPER, new Table(1.0, 5, List.of(d(Material.GUNPOWDER, 0, 2, 1.0))));
+        TABLES.put(EntityType.ZOMBIFIED_PIGLIN, new Table(1.0, 5, List.of(d(Material.ROTTEN_FLESH, 0, 1, 1.0),
+                d(Material.GOLD_NUGGET, 0, 1, 0.5), d(Material.GOLD_INGOT, 1, 1, 0.025))));
+        TABLES.put(EntityType.SLIME, new Table(1.0, 4, List.of(d(Material.SLIME_BALL, 0, 2, 1.0))));
+        TABLES.put(EntityType.MAGMA_CUBE, new Table(1.0, 4, List.of(d(Material.MAGMA_CREAM, 0, 1, 0.25))));
+        TABLES.put(EntityType.WITCH, new Table(1.0, 5, List.of(d(Material.GLASS_BOTTLE, 0, 2, 1.0),
+                d(Material.GLOWSTONE_DUST, 0, 2, 1.0), d(Material.GUNPOWDER, 0, 2, 1.0), d(Material.REDSTONE, 0, 2, 1.0),
+                d(Material.SPIDER_EYE, 0, 2, 1.0), d(Material.SUGAR, 0, 2, 1.0), d(Material.STICK, 0, 2, 1.0))));
+        TABLES.put(EntityType.BLAZE, new Table(1.0, 10, List.of(d(Material.BLAZE_ROD, 0, 1, 1.0))));
+        TABLES.put(EntityType.ENDERMAN, new Table(1.0, 5, List.of(d(Material.ENDER_PEARL, 0, 1, 1.0))));
+        TABLES.put(EntityType.WITHER_SKELETON, new Table(1.0, 5, List.of(d(Material.BONE, 0, 2, 1.0), d(Material.COAL, 0, 1, 0.33))));
+        TABLES.put(EntityType.IRON_GOLEM, new Table(1.0, 0, List.of(d(Material.IRON_INGOT, 3, 5, 1.0), d(Material.POPPY, 0, 2, 1.0))));
+    }
+
+    /** Sell prices for drops that are not in prices.yml. */
+    private static final Map<Material, Double> FALLBACK = Map.ofEntries(
+            Map.entry(Material.PORKCHOP, 2.0), Map.entry(Material.BEEF, 2.0), Map.entry(Material.CHICKEN, 1.5),
+            Map.entry(Material.MUTTON, 2.0), Map.entry(Material.WHITE_WOOL, 3.0), Map.entry(Material.GOLD_NUGGET, 4.0),
+            Map.entry(Material.MAGMA_CREAM, 15.0), Map.entry(Material.GLASS_BOTTLE, 2.0),
+            Map.entry(Material.POPPY, 1.0), Map.entry(Material.STICK, 1.0));
+
+    private static final String PURPLE = "&#A855F7";
+
+    private final JavaPlugin plugin;
+    private final PriceManager prices;
+    private final NamespacedKey typeKey;
+    private final File file;
+    private final Map<String, SpawnerData> spawners = new HashMap<>();
+    private SpawnerGui gui;
+    private boolean dirty;
+    private BukkitTask produceTask;
+    private BukkitTask saveTask;
+
+    public SpawnerManager(JavaPlugin plugin, PriceManager prices) {
+        this.plugin = plugin;
+        this.prices = prices;
+        this.typeKey = new NamespacedKey(plugin, "spawner_type");
+        this.file = new File(plugin.getDataFolder(), "spawners.yml");
+        load();
+    }
+
+    public void setGui(SpawnerGui gui) {
+        this.gui = gui;
+    }
+
+    public void reload() {
+        plugin.getConfig().addDefault("spawners.cycle-seconds", 10);
+        plugin.getConfig().addDefault("spawners.mobs-per-cycle", 3);
+        plugin.getConfig().addDefault("spawners.max-storage", 20000);
+        plugin.getConfig().addDefault("spawners.sell-multiplier", 1.0);
+        plugin.getConfig().options().copyDefaults(true);
+        plugin.saveConfig();
+
+        if (produceTask != null) produceTask.cancel();
+        long ticks = Math.max(1, plugin.getConfig().getInt("spawners.cycle-seconds", 10)) * 20L;
+        produceTask = Bukkit.getScheduler().runTaskTimer(plugin, this::produce, ticks, ticks);
+        if (saveTask == null) saveTask = Bukkit.getScheduler().runTaskTimer(plugin, this::save, 1200L, 1200L);
+    }
+
+    public void stop() {
+        if (produceTask != null) produceTask.cancel();
+        if (saveTask != null) saveTask.cancel();
+        save();
+    }
+
+    // ------------------------------------------------------------------ helpers used by the menus
+
+    public static boolean supports(EntityType type) {
+        return TABLES.containsKey(type);
+    }
+
+    public static Set<EntityType> supportedTypes() {
+        return TABLES.keySet();
+    }
+
+    public static String typeName(EntityType type) {
+        StringBuilder sb = new StringBuilder();
+        for (String w : type.name().toLowerCase(Locale.ROOT).split("_")) {
+            if (w.isEmpty()) continue;
+            if (sb.length() > 0) sb.append(' ');
+            sb.append(Character.toUpperCase(w.charAt(0))).append(w.substring(1));
+        }
+        return sb.toString();
+    }
+
+    public String describeDrops(EntityType type) {
+        Table t = TABLES.get(type);
+        if (t == null) return "-";
+        List<String> names = new ArrayList<>();
+        for (Drop dr : t.drops()) {
+            if (names.size() >= 4) break;
+            names.add(Text.pretty(dr.item()));
+        }
+        return String.join(", ", names);
+    }
+
+    public double priceOf(Material m) {
+        double v = prices.sellPrice(m);
+        return v > 0 ? v : FALLBACK.getOrDefault(m, 0.0);
+    }
+
+    public double sellMultiplier() {
+        return Math.max(0, plugin.getConfig().getDouble("spawners.sell-multiplier", 1.0));
+    }
+
+    public double valueOf(SpawnerData data) {
+        double total = 0;
+        for (Map.Entry<Material, Long> e : data.storage.entrySet()) {
+            total += priceOf(e.getKey()) * e.getValue();
+        }
+        return total * sellMultiplier();
+    }
+
+    public boolean canManage(Player p, SpawnerData data) {
+        return p.getUniqueId().equals(data.owner) || p.hasPermission("structuresmp.admin");
+    }
+
+    public void touch() {
+        dirty = true;
+    }
+
+    // ------------------------------------------------------------------ item
+
+    public ItemStack createItem(EntityType type) {
+        ItemStack item = new ItemStack(Material.SPAWNER);
+        ItemMeta meta = item.getItemMeta();
+        meta.displayName(Text.lore("&#C77DFF&l" + typeName(type) + " Spawner"));
+        meta.lore(List.of(
+                Text.lore("&7กรงสปาวเนอร์ ผลิตของให้เองโดยไม่ต้องมีม็อบ"),
+                Text.lore("&7วางแล้วคลิกขวาที่กรงเพื่อเปิดเมนู"),
+                Text.lore(" "),
+                Text.lore(PURPLE + "Structure Smp")));
+        meta.getPersistentDataContainer().set(typeKey, PersistentDataType.STRING, type.name());
+        if (meta instanceof BlockStateMeta bsm && bsm.getBlockState() instanceof CreatureSpawner cs) {
+            cs.setSpawnedType(type);
+            bsm.setBlockState(cs);
+        }
+        item.setItemMeta(meta);
+        return item;
+    }
+
+    private EntityType typeOf(ItemStack item) {
+        if (item == null || !item.hasItemMeta()) return null;
+        String name = item.getItemMeta().getPersistentDataContainer().get(typeKey, PersistentDataType.STRING);
+        if (name == null) return null;
+        try {
+            return EntityType.valueOf(name);
+        } catch (IllegalArgumentException e) {
+            return null;
+        }
+    }
+
+    private static String key(Block b) {
+        return b.getWorld().getName() + ";" + b.getX() + ";" + b.getY() + ";" + b.getZ();
+    }
+
+    // ------------------------------------------------------------------ production
+
+    private void produce() {
+        int base = Math.max(1, plugin.getConfig().getInt("spawners.mobs-per-cycle", 3));
+        long cap = Math.max(1, plugin.getConfig().getLong("spawners.max-storage", 20000L));
+        ThreadLocalRandom rnd = ThreadLocalRandom.current();
+        List<String> invalid = new ArrayList<>();
+
+        for (SpawnerData data : spawners.values()) {
+            World w = Bukkit.getWorld(data.world);
+            if (w == null || !w.isChunkLoaded(data.x >> 4, data.z >> 4)) continue;
+            if (w.getBlockAt(data.x, data.y, data.z).getType() != Material.SPAWNER) {
+                invalid.add(data.key());
+                continue;
+            }
+            Table t = TABLES.get(data.type);
+            if (t == null) continue;
+
+            int mobs = Math.max(1, (int) Math.round(base * t.rate()));
+            long stored = data.stored();
+            for (int i = 0; i < mobs; i++) {
+                data.mobs++;
+                data.xp += t.xp();
+                for (Drop dr : t.drops()) {
+                    if (rnd.nextDouble() > dr.chance()) continue;
+                    long n = dr.min() + rnd.nextInt(dr.max() - dr.min() + 1);
+                    n = Math.min(n, cap - stored);
+                    if (n <= 0) continue;
+                    data.storage.merge(dr.item(), n, Long::sum);
+                    stored += n;
+                    data.produced += n;
+                }
+            }
+        }
+        for (String k : invalid) spawners.remove(k);
+        dirty = true;
+    }
+
+    // ------------------------------------------------------------------ events
+
+    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
+    public void onPlace(BlockPlaceEvent e) {
+        EntityType type = typeOf(e.getItemInHand());
+        Block b = e.getBlockPlaced();
+        if (type == null || b.getType() != Material.SPAWNER) return;
+
+        Player p = e.getPlayer();
+        spawners.put(key(b), new SpawnerData(b.getWorld().getName(), b.getX(), b.getY(), b.getZ(),
+                type, p.getUniqueId(), p.getName()));
+        if (b.getState() instanceof CreatureSpawner cs) {
+            cs.setSpawnedType(type);
+            cs.update();
+        }
+        dirty = true;
+        save();
+        p.sendMessage(Text.c(PURPLE + "วาง " + typeName(type) + " Spawner แล้ว คลิกขวาที่กรงเพื่อเปิดเมนู"));
+    }
+
+    @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
+    public void onBreak(BlockBreakEvent e) {
+        Block b = e.getBlock();
+        if (b.getType() != Material.SPAWNER) return;
+        SpawnerData data = spawners.get(key(b));
+        if (data == null) return; // a vanilla spawner: normal behaviour
+
+        Player p = e.getPlayer();
+        if (!canManage(p, data)) {
+            e.setCancelled(true);
+            p.sendMessage(Text.c("&cสปาวเนอร์นี้เป็นของ " + data.ownerName));
+            return;
+        }
+        if (data.stored() > 0) {
+            e.setCancelled(true);
+            p.sendMessage(Text.c(PURPLE + "ยังมีของอยู่ในสปาวเนอร์ ขายหรือทิ้งก่อนแล้วค่อยทุบ"));
+            return;
+        }
+
+        e.setDropItems(false);
+        e.setExpToDrop(0);
+        spawners.remove(key(b));
+        dirty = true;
+        if (data.xp > 0) p.giveExp((int) Math.min(data.xp, 2_000_000_000L));
+        b.getWorld().dropItemNaturally(b.getLocation().add(0.5, 0.5, 0.5), createItem(data.type));
+        save();
+    }
+
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
+    public void onInteract(PlayerInteractEvent e) {
+        if (e.getAction() != Action.RIGHT_CLICK_BLOCK) return;
+        Block b = e.getClickedBlock();
+        if (b == null || b.getType() != Material.SPAWNER) return;
+        SpawnerData data = spawners.get(key(b));
+        if (data == null) return;
+
+        Player p = e.getPlayer();
+        ItemStack hand = p.getInventory().getItemInMainHand();
+        boolean egg = hand.getType().name().endsWith("_SPAWN_EGG");
+        if (p.isSneaking() && !hand.getType().isAir() && !egg) return; // let players place blocks against it
+
+        e.setCancelled(true);
+        if (e.getHand() != EquipmentSlot.HAND) return;
+        if (!canManage(p, data)) {
+            p.sendMessage(Text.c("&cสปาวเนอร์นี้เป็นของ " + data.ownerName));
+            return;
+        }
+        if (gui != null) gui.open(p, data);
+    }
+
+    /** Our cages never spawn real mobs. */
+    @EventHandler
+    public void onSpawn(SpawnerSpawnEvent e) {
+        CreatureSpawner cs = e.getSpawner();
+        if (cs != null && spawners.containsKey(key(cs.getBlock()))) e.setCancelled(true);
+    }
+
+    @EventHandler(ignoreCancelled = true)
+    public void onEntityExplode(EntityExplodeEvent e) {
+        e.blockList().removeIf(b -> spawners.containsKey(key(b)));
+    }
+
+    @EventHandler(ignoreCancelled = true)
+    public void onBlockExplode(BlockExplodeEvent e) {
+        e.blockList().removeIf(b -> spawners.containsKey(key(b)));
+    }
+
+    // ------------------------------------------------------------------ saving
+
+    private void load() {
+        if (!file.exists()) return;
+        YamlConfiguration yml = YamlConfiguration.loadConfiguration(file);
+        ConfigurationSection section = yml.getConfigurationSection("spawners");
+        if (section == null) return;
+        for (String id : section.getKeys(false)) {
+            ConfigurationSection s = section.getConfigurationSection(id);
+            if (s == null) continue;
+            try {
+                SpawnerData data = new SpawnerData(s.getString("world", ""), s.getInt("x"), s.getInt("y"), s.getInt("z"),
+                        EntityType.valueOf(s.getString("type", "")),
+                        UUID.fromString(s.getString("owner", "")), s.getString("owner-name", "???"));
+                data.xp = s.getLong("xp");
+                data.mobs = s.getLong("mobs");
+                data.produced = s.getLong("produced");
+                ConfigurationSection st = s.getConfigurationSection("storage");
+                if (st != null) {
+                    for (String name : st.getKeys(false)) {
+                        Material m = Material.matchMaterial(name);
+                        if (m != null && st.getLong(name) > 0) data.storage.put(m, st.getLong(name));
+                    }
+                }
+                spawners.put(data.key(), data);
+            } catch (IllegalArgumentException ignored) {
+                // skip broken entries
+            }
+        }
+    }
+
+    public void save() {
+        if (!dirty) return;
+        YamlConfiguration yml = new YamlConfiguration();
+        int n = 0;
+        for (SpawnerData data : spawners.values()) {
+            String base = "spawners." + (n++);
+            yml.set(base + ".world", data.world);
+            yml.set(base + ".x", data.x);
+            yml.set(base + ".y", data.y);
+            yml.set(base + ".z", data.z);
+            yml.set(base + ".type", data.type.name());
+            yml.set(base + ".owner", data.owner.toString());
+            yml.set(base + ".owner-name", data.ownerName);
+            yml.set(base + ".xp", data.xp);
+            yml.set(base + ".mobs", data.mobs);
+            yml.set(base + ".produced", data.produced);
+            for (Map.Entry<Material, Long> e : data.storage.entrySet()) {
+                yml.set(base + ".storage." + e.getKey().name(), e.getValue());
+            }
+        }
+        try {
+            plugin.getDataFolder().mkdirs();
+            yml.save(file);
+            dirty = false;
+        } catch (IOException ex) {
+            plugin.getLogger().warning("Could not save spawners.yml: " + ex.getMessage());
+        }
+    }
+}
