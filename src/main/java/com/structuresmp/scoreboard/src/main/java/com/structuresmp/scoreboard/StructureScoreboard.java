@@ -64,6 +64,7 @@ public final class StructureScoreboard extends JavaPlugin implements Listener, C
     private SpawnerGui spawnerGui;
     private SpecialShopGui specialShop;
     private CodeManager codes;
+    private BountyManager bounty;
 
     private BukkitTask task;
     private BukkitTask titleTask;
@@ -138,6 +139,7 @@ public final class StructureScoreboard extends JavaPlugin implements Listener, C
         specialShop = new SpecialShopGui(this, economy, hammer, spawnerMgr, shopGui);
         shopGui.setSpecialShop(specialShop);
         codes = new CodeManager(this, economy, points);
+        bounty = new BountyManager(this, economy);
 
         Commands commands = new Commands(economy, points, prices, shopGui, sellGui, auctionGui, orderGui, rtp);
         for (String name : new String[] {"bal", "pay", "points", "addmoney", "removemoney", "addpoint", "removepoint",
@@ -149,6 +151,13 @@ public final class StructureScoreboard extends JavaPlugin implements Listener, C
         getCommand("hammer").setExecutor(hammer);
         PluginCommand codeCommand = getCommand("code");
         if (codeCommand != null) codeCommand.setExecutor(codes);
+        PluginCommand bountyCommand = getCommand("bounty");
+        if (bountyCommand != null) bountyCommand.setExecutor(bounty);
+        UtilityCommands utility = new UtilityCommands(combat);
+        for (String name : new String[] {"ec", "nv"}) {
+            PluginCommand pc = getCommand(name);
+            if (pc != null) pc.setExecutor(utility);
+        }
 
         getServer().getPluginManager().registerEvents(this, this);
         getServer().getPluginManager().registerEvents(shopGui, this);
@@ -160,6 +169,7 @@ public final class StructureScoreboard extends JavaPlugin implements Listener, C
         getServer().getPluginManager().registerEvents(spawnerMgr, this);
         getServer().getPluginManager().registerEvents(spawnerGui, this);
         getServer().getPluginManager().registerEvents(specialShop, this);
+        getServer().getPluginManager().registerEvents(bounty, this);
 
         loadSettings();
         Bukkit.getScheduler().runTaskTimer(this, () -> {
@@ -174,6 +184,7 @@ public final class StructureScoreboard extends JavaPlugin implements Listener, C
         if (combat != null) combat.stop();
         if (effects != null) effects.stop();
         if (spawnerMgr != null) spawnerMgr.stop();
+        if (bounty != null) bounty.stop();
         if (task != null) task.cancel();
         if (titleTask != null) titleTask.cancel();
         for (Player p : Bukkit.getOnlinePlayers()) remove(p);
@@ -192,6 +203,7 @@ public final class StructureScoreboard extends JavaPlugin implements Listener, C
         hammer.reload();
         spawnerMgr.reload();
         specialShop.reload();
+        bounty.reload();
 
         title = getConfig().getString("title", "&d&lStructure Smp");
         lines = getConfig().getStringList("lines");
