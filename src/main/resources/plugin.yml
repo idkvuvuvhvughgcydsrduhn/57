@@ -1,5 +1,5 @@
 name: StructureScoreboard
-version: 1.7.0
+version: 1.8.0
 main: com.structuresmp.scoreboard.StructureScoreboard
 api-version: "1.21"
 description: Scoreboard, economy, shop, auction house, orders and RTP for Structure Smp
@@ -42,6 +42,16 @@ commands:
   code:
     description: Redeem a code (OP can manage codes)
     usage: /code <code>
+  bounty:
+    description: Put a bounty on a player
+    usage: /bounty <player> <amount> | /bounty list
+    aliases: [bounties]
+  ec:
+    description: Open your ender chest
+    usage: /ec
+  nv:
+    description: Toggle night vision
+    usage: /nv
   baltop:
     description: Richest players
     usage: /baltop
