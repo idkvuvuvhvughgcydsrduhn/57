@@ -1,5 +1,5 @@
 name: StructureScoreboard
-version: 1.6.0
+version: 1.7.0
 main: com.structuresmp.scoreboard.StructureScoreboard
 api-version: "1.21"
 description: Scoreboard, economy, shop, auction house, orders and RTP for Structure Smp
@@ -39,6 +39,9 @@ commands:
   hammer:
     description: Give the 3x3 Hammer (OP) or re-send the resource pack
     usage: /hammer [player] | /hammer pack
+  code:
+    description: Redeem a code (OP can manage codes)
+    usage: /code <code>
   baltop:
     description: Richest players
     usage: /baltop
