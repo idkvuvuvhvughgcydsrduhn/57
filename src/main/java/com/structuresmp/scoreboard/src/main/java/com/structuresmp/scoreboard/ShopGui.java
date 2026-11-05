@@ -26,6 +26,11 @@ public final class ShopGui implements Listener {
     private final JavaPlugin plugin;
     private final EconomyManager economy;
     private final PriceManager prices;
+    private SpecialShopGui special;
+
+    public void setSpecialShop(SpecialShopGui special) {
+        this.special = special;
+    }
 
     public ShopGui(JavaPlugin plugin, EconomyManager economy, PriceManager prices) {
         this.plugin = plugin;
@@ -53,6 +58,9 @@ public final class ShopGui implements Listener {
         if (pg > 0) inv.setItem(45, named(Material.ARROW, "&eหน้าก่อนหน้า"));
         if (pg < pages - 1) inv.setItem(53, named(Material.ARROW, "&eหน้าถัดไป"));
         inv.setItem(49, balanceItem(p));
+        // special shop button, just left of the next-page arrow
+        inv.setItem(52, Gui.named(Material.NETHER_STAR, "&#C77DFF&lร้านค้าพิเศษ",
+                "&7Netherite Pickaxe 3x3 และกรงสปาวเนอร์", " ", "&eคลิกเพื่อเปิด"));
 
         p.openInventory(inv);
     }
@@ -99,6 +107,10 @@ public final class ShopGui implements Listener {
         if ((raw == 45 || raw == 53) && clicked != null && clicked.getType() == Material.ARROW) {
             int target = raw == 45 ? holder.page - 1 : holder.page + 1;
             Bukkit.getScheduler().runTask(plugin, () -> open(p, target));
+            return;
+        }
+        if (raw == 52 && special != null) {
+            Bukkit.getScheduler().runTask(plugin, () -> special.open(p));
             return;
         }
         if (raw >= PAGE_SIZE || !e.isLeftClick()) return;
