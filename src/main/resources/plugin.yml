@@ -1,5 +1,5 @@
 name: StructureScoreboard
-version: 1.9.0
+version: 1.10.0
 main: com.structuresmp.scoreboard.StructureScoreboard
 api-version: "1.21"
 description: Scoreboard, economy, shop, auction house, orders and RTP for Structure Smp
@@ -52,6 +52,19 @@ commands:
   nv:
     description: Toggle night vision
     usage: /nv
+  sethome:
+    description: Set a home at your location
+    usage: /sethome [name]
+  home:
+    description: Teleport to a home
+    usage: /home [name]
+  delhome:
+    description: Delete a home
+    usage: /delhome <name>
+    aliases: [removehome]
+  homes:
+    description: List your homes
+    usage: /homes
   baltop:
     description: Richest players
     usage: /baltop
