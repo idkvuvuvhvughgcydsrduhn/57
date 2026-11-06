@@ -66,6 +66,7 @@ public final class StructureScoreboard extends JavaPlugin implements Listener, C
     private CodeManager codes;
     private BountyManager bounty;
     private TabListManager tabList;
+    private HomeManager homes;
 
     private BukkitTask task;
     private BukkitTask titleTask;
@@ -142,6 +143,7 @@ public final class StructureScoreboard extends JavaPlugin implements Listener, C
         codes = new CodeManager(this, economy, points);
         bounty = new BountyManager(this, economy);
         tabList = new TabListManager(this);
+        homes = new HomeManager(this, combat);
 
         Commands commands = new Commands(economy, points, prices, shopGui, sellGui, auctionGui, orderGui, rtp);
         for (String name : new String[] {"bal", "pay", "points", "addmoney", "removemoney", "addpoint", "removepoint",
@@ -159,6 +161,10 @@ public final class StructureScoreboard extends JavaPlugin implements Listener, C
         for (String name : new String[] {"ec", "nv"}) {
             PluginCommand pc = getCommand(name);
             if (pc != null) pc.setExecutor(utility);
+        }
+        for (String name : new String[] {"sethome", "home", "delhome", "homes"}) {
+            PluginCommand pc = getCommand(name);
+            if (pc != null) pc.setExecutor(homes);
         }
 
         getServer().getPluginManager().registerEvents(this, this);
@@ -208,6 +214,7 @@ public final class StructureScoreboard extends JavaPlugin implements Listener, C
         specialShop.reload();
         bounty.reload();
         tabList.reload();
+        homes.reload();
 
         title = getConfig().getString("title", "&d&lStructure Smp");
         lines = getConfig().getStringList("lines");
