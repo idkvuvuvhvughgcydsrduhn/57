@@ -1,5 +1,5 @@
 name: StructureScoreboard
-version: 1.10.0
+version: 1.11.0
 main: com.structuresmp.scoreboard.StructureScoreboard
 api-version: "1.21"
 description: Scoreboard, economy, shop, auction house, orders and RTP for Structure Smp
@@ -65,6 +65,12 @@ commands:
   homes:
     description: List your homes
     usage: /homes
+  veinpick:
+    description: Give the Vein Miner Pickaxe (OP)
+    usage: /veinpick [player]
+  timberaxe:
+    description: Give the Timber Axe (OP)
+    usage: /timberaxe [player]
   baltop:
     description: Richest players
     usage: /baltop
