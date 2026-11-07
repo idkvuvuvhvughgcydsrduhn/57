@@ -96,25 +96,6 @@ commands:
     description: Buy orders
     usage: /orders [create <item> <amount> <price>|mine]
     aliases: [order]
-  tpa:
-    description: ask to teleport to a player
-    usage: /tpa [player]
-    aliases: [teleport]
-  tpahere: 
-    description: ask a player to teleport to you
-    usage: /tpahere [player]
-  tpaccept:
-    description: accept a tpa from player
-    usage: /tpaccept 
-  tpdeny:
-    description: deny a tpa from player
-    usage: /tpdeny
-  tpcancel:
-    description: cancel tpa
-    usage: /tpcancel
-  tpatoggle:
-    description: toggle auto tpa
-    usage: /tpatoggle
 permissions:
   structuresmp.admin:
     description: Reload the plugin config
