@@ -1,12 +1,69 @@
-# Placeholders: %player% %money% %kills% %deaths% %kd% %playtime% %ping% %online% %max%
+# Placeholders: %player% %rank% %money% %points% %kills% %deaths% %kd% %playtime% %ping% %online% %max%
 # Color codes: &a &b ... and hex like &#ff8800  (max 15 lines)
-title: "&7&lStructure Smp"
+title: "&d&lStructure Smp"
 update-ticks: 20
+config-version: 2
 lines:
-  - "&7&m                    "
-  - "&eเงิน: &f$%money%"
-  - "&cคิล: &f%kills% &7(K/D %kd%)"
-  - "&4ตาย: &f%deaths%"
-  - "&aเวลาเล่น: &f%playtime%"
-  - "&dปิง: %ping%"
-  - "&7&m                    "
+  - "&5&m                    "
+  - "&d» &7ยศ: &f%rank%"
+  - "&d» &7เงิน: &f$%money%"
+  - "&d» &7พ้อย: &f%points%"
+  - "&d» &7คิล: &f%kills% &8(K/D &f%kd%&8)"
+  - "&d» &7ตาย: &f%deaths%"
+  - "&d» &7เวลาเล่น: &f%playtime%"
+  - "&d» &7ปิง: %ping%"
+  - "&5&m                    "
+
+# ยศ
+ranks:
+  default: member
+  prefix-format: "%color%&l[%display%]&r "
+  chat-enabled: true
+  chat-format: "%rank%&f%name%&7: &f%message%"
+  list:
+    owner:
+      display: Owner
+      color: "&#FFAA00"
+      weight: 100
+      max-homes: -1
+    co-owner:
+      display: Co-Owner
+      color: "&#FF8C2A"
+      weight: 90
+      max-homes: 30
+    admin:
+      display: Admin
+      color: "&#FF3333"
+      weight: 80
+      max-homes: 20
+    staff:
+      display: Staff
+      color: "&#3399FF"
+      weight: 60
+      max-homes: 12
+    media:
+      display: Media
+      color: "&#FF69B4"
+      weight: 40
+      max-homes: 8
+    supporter:
+      display: Supporter
+      color: "&#00D6A3"
+      weight: 30
+      max-homes: 6
+    member:
+      display: Member
+      color: "&#8B5CF6"
+      weight: 10
+      max-homes: 3
+
+# กรงสปาวเนอร์
+spawners:
+  cycle-seconds: 10
+  mobs-per-cycle: 3
+  max-storage: 20000
+  sell-multiplier: 1.0
+  natural-break: true
+  require-silk-touch: true
+  require-pickaxe: true
+  drop-chance: 100.0
