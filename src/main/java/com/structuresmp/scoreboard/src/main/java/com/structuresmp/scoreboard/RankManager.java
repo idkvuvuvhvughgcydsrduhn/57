@@ -69,13 +69,13 @@ public final class RankManager implements Listener, TabExecutor {
     public void reload() {
         plugin.getConfig().addDefault("ranks.default", "member");
         plugin.getConfig().addDefault("ranks.prefix-format", "%color%&l[%display%]&r ");
-        defaultRank("owner", "Owner", "&#FFD54A", 100, -1);
-        defaultRank("co-owner", "Co-Owner", "&#FFA726", 90, 30);
-        defaultRank("admin", "Admin", "&#FF5555", 80, 20);
-        defaultRank("staff", "Staff", "&#55AAFF", 60, 12);
-        defaultRank("media", "Media", "&#FF6EC7", 40, 8);
-        defaultRank("supporter", "Supporter", "&#55FFAA", 30, 6);
-        defaultRank("member", "Member", "&#AAAAAA", 10, 3);
+        defaultRank("owner", "Owner", "&#FFD700", 100, -1);
+defaultRank("co-owner", "Co-Owner", "&#FF8C00", 90, 30);
+defaultRank("admin", "Admin", "&#FF3333", 80, 20);
+defaultRank("staff", "Staff", "&#3399FF", 60, 12);
+defaultRank("media", "Media", "&#FF69B4", 40, 8);
+defaultRank("supporter", "Supporter", "&#00D6A3", 30, 6);
+defaultRank("member", "Member", "&#8B5CF6", 10, 3);
         plugin.getConfig().options().copyDefaults(true);
         plugin.saveConfig();
 
