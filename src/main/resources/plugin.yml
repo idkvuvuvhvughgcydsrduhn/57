@@ -2,7 +2,11 @@ name: StructureScoreboard
 version: 1.11.0
 main: com.structuresmp.scoreboard.StructureScoreboard
 api-version: "1.21"
-description: Scoreboard, economy, shop, auction house, orders and RTP for Structure Smp
+description: Scoreboard, economy, shop, auction house, orders and RTP for Structure SMP
+softdepend:
+  - LuckPerms
+  - PlaceholderAPI
+
 commands:
   sb:
     description: Toggle the scoreboard
@@ -96,10 +100,28 @@ commands:
     description: Buy orders
     usage: /orders [create <item> <amount> <price>|mine]
     aliases: [order]
+  rank:
+    description: View and manage player ranks
+    usage: /rank <list|info|set|remove|homes|reload>
+    aliases: [ranks]
+  setrank:
+    description: Set a player's rank
+    usage: /setrank <player> <rank>
+    permission: structuresmp.admin
+
 permissions:
   structuresmp.admin:
-    description: Reload the plugin config
+    description: Administrative access to StructureScoreboard and rank management
     default: op
   structuresmp.rtp.bypass:
     description: Skip the /rtp cooldown
     default: op
+  structuresmp.rank.admin:
+    description: Dedicated permission for rank administration (requires matching Java permission check)
+    default: op
+  structuresmp.rank.list:
+    description: View the list of available ranks
+    default: true
+  structuresmp.rank.info:
+    description: View rank information
+    default: true
