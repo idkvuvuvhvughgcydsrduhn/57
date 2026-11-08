@@ -1,6 +1,7 @@
 package com.structuresmp.scoreboard;
 
 import net.kyori.adventure.text.Component;
+import net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer;
 import org.bukkit.Bukkit;
 import org.bukkit.OfflinePlayer;
 import org.bukkit.command.Command;
@@ -10,7 +11,9 @@ import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
+import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
+import org.bukkit.event.player.AsyncPlayerChatEvent;
 import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.plugin.java.JavaPlugin;
@@ -47,6 +50,9 @@ public final class RankManager implements Listener, TabExecutor {
     private final Map<String, Rank> ranks = new LinkedHashMap<>(); // highest weight first
     private String defaultId = "member";
     private String prefixFormat = "%color%&l[%display%]&r ";
+    /** รูปแบบแชท: %rank% = ยศ, %name% = ชื่อผู้เล่น, %message% = ข้อความ */
+    private String chatFormat = "%rank%&f%name%&7: &f%message%";
+    private boolean chatEnabled = true;
     private BukkitTask task;
 
     public RankManager(JavaPlugin plugin, EconomyManager economy) {
@@ -69,6 +75,8 @@ public final class RankManager implements Listener, TabExecutor {
     public void reload() {
         plugin.getConfig().addDefault("ranks.default", "member");
         plugin.getConfig().addDefault("ranks.prefix-format", "%color%&l[%display%]&r ");
+        plugin.getConfig().addDefault("ranks.chat-enabled", true);
+        plugin.getConfig().addDefault("ranks.chat-format", "%rank%&f%name%&7: &f%message%");
         defaultRank("owner", "Owner", "&#FFD700", 100, -1);
         defaultRank("co-owner", "Co-Owner", "&#FF8C00", 90, 30);
         defaultRank("admin", "Admin", "&#FF3333", 80, 20);
@@ -81,6 +89,8 @@ public final class RankManager implements Listener, TabExecutor {
 
         var cfg = plugin.getConfig();
         prefixFormat = cfg.getString("ranks.prefix-format", "%color%&l[%display%]&r ");
+        chatEnabled = cfg.getBoolean("ranks.chat-enabled", true);
+        chatFormat = cfg.getString("ranks.chat-format", "%rank%&f%name%&7: &f%message%");
 
         List<Rank> loaded = new ArrayList<>();
         ConfigurationSection list = cfg.getConfigurationSection("ranks.list");
@@ -191,6 +201,7 @@ public final class RankManager implements Listener, TabExecutor {
             Component prefix = Text.c(prefixOf(r));
             // Always keep prefix in sync (rank color/display can change on reload)
             team.prefix(prefix);
+            team.suffix(Component.empty());
 
             String entry = t.getName();
             Team current = sb.getEntryTeam(entry);
@@ -226,6 +237,33 @@ public final class RankManager implements Listener, TabExecutor {
             Team team = viewer.getScoreboard().getEntryTeam(entry);
             if (team != null && team.getName().startsWith("rk")) team.removeEntry(entry);
         }
+    }
+
+    // ------------------------------------------------------------------ chat format: [Rank] Name: message
+
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
+    public void onChat(AsyncPlayerChatEvent e) {
+        if (!chatEnabled) return;
+
+        Player p = e.getPlayer();
+        Rank r = rankOf(p);
+        String rankTag = prefixOf(r); // e.g. "&#8B5CF6&l[Member]&r "
+
+        // สร้าง format แบบ legacy เพื่อให้ใช้กับ setFormat ได้
+        String format = chatFormat
+                .replace("%rank%", rankTag)
+                .replace("%name%", "%1$s")
+                .replace("%message%", "%2$s");
+
+        // แปลง &#RRGGBB + &code → § (รองรับ hex)
+        try {
+            Component component = Text.c(format);
+            format = LegacyComponentSerializer.legacySection().serialize(component);
+        } catch (Throwable ignored) {
+            format = format.replace('&', '§');
+        }
+
+        e.setFormat(format);
     }
 
     // ------------------------------------------------------------------ commands
