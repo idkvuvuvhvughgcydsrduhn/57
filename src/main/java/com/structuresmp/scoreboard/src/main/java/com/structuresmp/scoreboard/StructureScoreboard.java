@@ -36,6 +36,7 @@ public final class StructureScoreboard extends JavaPlugin implements Listener, C
     /** Purple theme, used for new installs and when config-version is below 2. */
     private static final List<String> PURPLE_LINES = java.util.Arrays.asList(
             "&5&m                    ",
+            "&d» &7ยศ: &f%rank%",
             "&d» &7เงิน: &f$%money%",
             "&d» &7พ้อย: &f%points%",
             "&d» &7คิล: &f%kills% &8(K/D &f%kd%&8)",
@@ -233,6 +234,7 @@ public final class StructureScoreboard extends JavaPlugin implements Listener, C
         specialShop.reload();
         bounty.reload();
         tabList.reload();
+        if (ranks != null) ranks.reload();
         homes.reload();
         specialTools.reload();
 
@@ -314,6 +316,8 @@ public final class StructureScoreboard extends JavaPlugin implements Listener, C
         boards.put(p.getUniqueId(), b);
         p.setScoreboard(b.scoreboard);
         update(p, b);
+        // Rank teams must be applied to the new scoreboard immediately
+        if (ranks != null) ranks.refreshAll();
     }
 
     private void remove(Player p) {
@@ -346,8 +350,11 @@ public final class StructureScoreboard extends JavaPlugin implements Listener, C
         String moneyText = Text.money(economy.get(p.getUniqueId()));
         String pointsText = PointsManager.format(points.get(p.getUniqueId()));
 
+        String rankText = ranks != null ? ranks.coloredName(p) : "&7-";
+
         return line
                 .replace("%player%", p.getName())
+                .replace("%rank%", rankText)
                 .replace("%money%", moneyText)
                 .replace("%points%", pointsText)
                 .replace("%kills%", String.valueOf(kills))

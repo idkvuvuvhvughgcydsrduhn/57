@@ -70,12 +70,12 @@ public final class RankManager implements Listener, TabExecutor {
         plugin.getConfig().addDefault("ranks.default", "member");
         plugin.getConfig().addDefault("ranks.prefix-format", "%color%&l[%display%]&r ");
         defaultRank("owner", "Owner", "&#FFD700", 100, -1);
-defaultRank("co-owner", "Co-Owner", "&#FF8C00", 90, 30);
-defaultRank("admin", "Admin", "&#FF3333", 80, 20);
-defaultRank("staff", "Staff", "&#3399FF", 60, 12);
-defaultRank("media", "Media", "&#FF69B4", 40, 8);
-defaultRank("supporter", "Supporter", "&#00D6A3", 30, 6);
-defaultRank("member", "Member", "&#8B5CF6", 10, 3);
+        defaultRank("co-owner", "Co-Owner", "&#FF8C00", 90, 30);
+        defaultRank("admin", "Admin", "&#FF3333", 80, 20);
+        defaultRank("staff", "Staff", "&#3399FF", 60, 12);
+        defaultRank("media", "Media", "&#FF69B4", 40, 8);
+        defaultRank("supporter", "Supporter", "&#00D6A3", 30, 6);
+        defaultRank("member", "Member", "&#8B5CF6", 10, 3);
         plugin.getConfig().options().copyDefaults(true);
         plugin.saveConfig();
 
@@ -184,16 +184,23 @@ defaultRank("member", "Member", "&#8B5CF6", 10, 3);
             Rank r = rankOf(t);
             String name = teamName(r);
             Team team = sb.getTeam(name);
-            if (team == null) team = sb.registerNewTeam(name);
+            if (team == null) {
+                team = sb.registerNewTeam(name);
+            }
 
             Component prefix = Text.c(prefixOf(r));
-            if (!prefix.equals(team.prefix())) team.prefix(prefix);
+            // Always keep prefix in sync (rank color/display can change on reload)
+            team.prefix(prefix);
 
             String entry = t.getName();
             Team current = sb.getEntryTeam(entry);
-            if (current != null && current.getName().equals(name)) continue;
+            if (current != null && current.getName().equals(name)) {
+                continue; // already correct
+            }
             if (current != null) {
-                if (!current.getName().startsWith("rk")) continue; // belongs to another plugin's team: leave it
+                if (!current.getName().startsWith("rk")) {
+                    continue; // belongs to another plugin's team: leave it
+                }
                 current.removeEntry(entry);
             }
             team.addEntry(entry);
