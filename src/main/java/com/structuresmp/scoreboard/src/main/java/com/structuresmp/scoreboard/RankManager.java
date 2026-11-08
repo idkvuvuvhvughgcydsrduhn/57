@@ -1,7 +1,6 @@
 package com.structuresmp.scoreboard;
 
 import net.kyori.adventure.text.Component;
-import net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer;
 import org.bukkit.Bukkit;
 import org.bukkit.OfflinePlayer;
 import org.bukkit.command.Command;
@@ -77,8 +76,9 @@ public final class RankManager implements Listener, TabExecutor {
         plugin.getConfig().addDefault("ranks.prefix-format", "%color%&l[%display%]&r ");
         plugin.getConfig().addDefault("ranks.chat-enabled", true);
         plugin.getConfig().addDefault("ranks.chat-format", "%rank%&f%name%&7: &f%message%");
-        defaultRank("owner", "Owner", "&#FFD700", 100, -1);
-        defaultRank("co-owner", "Co-Owner", "&#FF8C00", 90, 30);
+        // สี hex หลีกเลี่ยงลงท้าย 0 ติดชื่อ (กันพาร์เซอร์กินตัวอักษร)
+        defaultRank("owner", "Owner", "&#FFAA00", 100, -1);
+        defaultRank("co-owner", "Co-Owner", "&#FF8C2A", 90, 30);
         defaultRank("admin", "Admin", "&#FF3333", 80, 20);
         defaultRank("staff", "Staff", "&#3399FF", 60, 12);
         defaultRank("media", "Media", "&#FF69B4", 40, 8);
@@ -134,14 +134,20 @@ public final class RankManager implements Listener, TabExecutor {
         return rankOf(p.getUniqueId());
     }
 
-    /** Coloured rank name for the scoreboard, e.g. "&#FFD54AOwner". */
+    /** Coloured rank name for the scoreboard, e.g. gold "Owner". */
     public String coloredName(Player p) {
         Rank r = rankOf(p);
-        return r.color() + r.display();
+        // ใส่ &l หลังสี hex เพื่อกันพาร์เซอร์กินตัวอักษรแรกของชื่อ (Owner → 0wner)
+        return r.color() + "&l" + r.display();
     }
 
     public String prefixOf(Rank r) {
-        return prefixFormat.replace("%color%", r.color()).replace("%display%", r.display());
+        // บังคับมี &l หลังสีเสมอ กัน hex ลงท้าย 0 กินตัวอักษรของชื่อยศ
+        String fmt = prefixFormat;
+        if (!fmt.contains("%color%&l") && !fmt.contains("%color%&L")) {
+            fmt = fmt.replace("%color%", "%color%&l");
+        }
+        return fmt.replace("%color%", r.color()).replace("%display%", r.display());
     }
 
     /** How many homes this player may have. */
@@ -247,23 +253,23 @@ public final class RankManager implements Listener, TabExecutor {
 
         Player p = e.getPlayer();
         Rank r = rankOf(p);
-        String rankTag = prefixOf(r); // e.g. "&#8B5CF6&l[Member]&r "
+        String rankTag = prefixOf(r); // e.g. "&#FFD700&l[Owner]&r "
 
-        // สร้าง format แบบ legacy เพื่อให้ใช้กับ setFormat ได้
-        String format = chatFormat
+        // ใช้ Adventure แทน setFormat เพื่อไม่ให้ hex สีพัง (เช่น Owner → 0wner)
+        String raw = chatFormat
                 .replace("%rank%", rankTag)
-                .replace("%name%", "%1$s")
-                .replace("%message%", "%2$s");
+                .replace("%name%", p.getName())
+                .replace("%message%", e.getMessage());
 
-        // แปลง &#RRGGBB + &code → § (รองรับ hex)
-        try {
-            Component component = Text.c(format);
-            format = LegacyComponentSerializer.legacySection().serialize(component);
-        } catch (Throwable ignored) {
-            format = format.replace('&', '§');
+        Component message = Text.c(raw);
+        e.setCancelled(true);
+
+        // ส่งให้ทุกคนที่อยู่ใน recipients (รองรับ ignore / vanish ของปลั๊กอินอื่น)
+        for (Player viewer : e.getRecipients()) {
+            viewer.sendMessage(message);
         }
-
-        e.setFormat(format);
+        // แสดงใน console ด้วย
+        Bukkit.getConsoleSender().sendMessage(message);
     }
 
     // ------------------------------------------------------------------ commands
