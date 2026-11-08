@@ -154,6 +154,11 @@ public final class SpawnerManager implements Listener {
         plugin.getConfig().addDefault("spawners.mobs-per-cycle", 3);
         plugin.getConfig().addDefault("spawners.max-storage", 20000);
         plugin.getConfig().addDefault("spawners.sell-multiplier", 1.0);
+        // ขุดกรงธรรมชาติ
+        plugin.getConfig().addDefault("spawners.natural-break", true);
+        plugin.getConfig().addDefault("spawners.require-silk-touch", true);
+        plugin.getConfig().addDefault("spawners.require-pickaxe", true);
+        plugin.getConfig().addDefault("spawners.drop-chance", 100.0);
         plugin.getConfig().options().copyDefaults(true);
         plugin.saveConfig();
 
@@ -322,28 +327,75 @@ public final class SpawnerManager implements Listener {
     public void onBreak(BlockBreakEvent e) {
         Block b = e.getBlock();
         if (b.getType() != Material.SPAWNER) return;
-        SpawnerData data = spawners.get(key(b));
-        if (data == null) return; // a vanilla spawner: normal behaviour
 
         Player p = e.getPlayer();
-        if (!canManage(p, data)) {
-            e.setCancelled(true);
-            p.sendMessage(Text.c("&cสปาวเนอร์นี้เป็นของ " + data.ownerName));
-            return;
-        }
-        if (data.stored() > 0) {
-            e.setCancelled(true);
-            p.sendMessage(Text.c(PURPLE + "ยังมีของอยู่ในสปาวเนอร์ ขายหรือทิ้งก่อนแล้วค่อยทุบ"));
+        SpawnerData data = spawners.get(key(b));
+
+        // ----- กรงที่ระบบจัดการ (ของ player) -----
+        if (data != null) {
+            if (!canManage(p, data)) {
+                e.setCancelled(true);
+                p.sendMessage(Text.c("&cสปาวเนอร์นี้เป็นของ " + data.ownerName));
+                return;
+            }
+            if (data.stored() > 0) {
+                e.setCancelled(true);
+                p.sendMessage(Text.c(PURPLE + "ยังมีของอยู่ในสปาวเนอร์ ขายหรือทิ้งก่อนแล้วค่อยทุบ"));
+                return;
+            }
+
+            e.setDropItems(false);
+            e.setExpToDrop(0);
+            spawners.remove(key(b));
+            dirty = true;
+            if (data.xp > 0) p.giveExp((int) Math.min(data.xp, 2_000_000_000L));
+            b.getWorld().dropItemNaturally(b.getLocation().add(0.5, 0.5, 0.5), createItem(data.type));
+            save();
             return;
         }
 
+        // ----- กรงธรรมชาติ (vanilla) → ขุดด้วย Silk Touch ได้ -----
+        if (!plugin.getConfig().getBoolean("spawners.natural-break", true)) return;
+        if (p.getGameMode() == org.bukkit.GameMode.CREATIVE) return;
+
+        ItemStack tool = p.getInventory().getItemInMainHand();
+        boolean requirePickaxe = plugin.getConfig().getBoolean("spawners.require-pickaxe", true);
+        boolean requireSilk = plugin.getConfig().getBoolean("spawners.require-silk-touch", true);
+        double chance = Math.max(0, Math.min(100, plugin.getConfig().getDouble("spawners.drop-chance", 100.0)));
+
+        if (requirePickaxe && (tool == null || !tool.getType().name().endsWith("_PICKAXE"))) {
+            return; // ไม่ใช่พิคแอ็กซ์ → พังตามปกติ ไม่ดรอป
+        }
+        if (requireSilk && (tool == null || !tool.containsEnchantment(org.bukkit.enchantments.Enchantment.SILK_TOUCH))) {
+            return; // ไม่มี Silk Touch → พังตามปกติ ไม่ดรอป
+        }
+        if (chance < 100.0 && ThreadLocalRandom.current().nextDouble() * 100.0 >= chance) {
+            e.setDropItems(false);
+            e.setExpToDrop(0);
+            p.sendMessage(Text.c("&cกรงสปาวเนอร์แตกแล้ว แต่ไม่ได้ดรอป (โชคไม่ดี)"));
+            return;
+        }
+
+        // อ่านประเภทม็อบจากบล็อก
+        EntityType type = EntityType.PIG;
+        if (b.getState() instanceof CreatureSpawner cs) {
+            EntityType spawned = cs.getSpawnedType();
+            if (spawned != null) type = spawned;
+        }
+
+        // ถ้าประเภทนี้ระบบไม่รองรับ ก็ยังดรอปเป็นไอเท็มธรรมดา (แต่จะวางแล้วไม่กลายเป็นกรงผลิต)
         e.setDropItems(false);
         e.setExpToDrop(0);
-        spawners.remove(key(b));
-        dirty = true;
-        if (data.xp > 0) p.giveExp((int) Math.min(data.xp, 2_000_000_000L));
-        b.getWorld().dropItemNaturally(b.getLocation().add(0.5, 0.5, 0.5), createItem(data.type));
-        save();
+
+        if (supports(type)) {
+            b.getWorld().dropItemNaturally(b.getLocation().add(0.5, 0.5, 0.5), createItem(type));
+            p.sendMessage(Text.c(PURPLE + "ขุดกรงสปาวเนอร์ &f" + typeName(type) + PURPLE + " สำเร็จ! วางแล้วจะกลายเป็นกรงผลิตของ"));
+        } else {
+            // ประเภทที่ไม่รองรับ → ดรอปกรงเปล่า (ยังใช้ typeKey ได้ แต่จะไม่ผลิต)
+            ItemStack item = createItem(type);
+            b.getWorld().dropItemNaturally(b.getLocation().add(0.5, 0.5, 0.5), item);
+            p.sendMessage(Text.c(PURPLE + "ขุดกรงสปาวเนอร์ &f" + typeName(type) + PURPLE + " สำเร็จ! &7(ประเภทนี้ยังไม่รองรับการผลิต)"));
+        }
     }
 
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
