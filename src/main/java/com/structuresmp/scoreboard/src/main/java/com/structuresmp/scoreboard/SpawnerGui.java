@@ -59,11 +59,15 @@ public final class SpawnerGui implements Listener {
         double value = manager.valueOf(d);
         int cycle = Math.max(1, plugin.getConfig().getInt("spawners.cycle-seconds", 10));
 
+        int maxStack = Math.max(1, plugin.getConfig().getInt("spawners.max-stack", 10000));
         inv.setItem(4, Gui.named(icon(d.type), "&#C77DFF&l" + SpawnerManager.typeName(d.type) + " Spawner",
                 "&7เจ้าของ: &f" + d.ownerName,
+                "&7ซ้อน: &f" + Math.max(1, d.stack) + "&7/&f" + maxStack,
                 "&7ม็อบที่ผลิตแล้ว: &f" + PointsManager.format(d.mobs),
                 "&7ของที่ผลิตได้ทั้งหมด: &f" + PointsManager.format(d.produced) + " ชิ้น",
-                "&7ผลิตทุก &f" + cycle + " &7วินาที"));
+                "&7ผลิตทุก &f" + cycle + " &7วินาที &8(×" + Math.max(1, d.stack) + ")",
+                " ",
+                "&eShift+คลิกขวา ถือกรงประเภทเดียวกันเพื่อซ้อน"));
         inv.setItem(10, Gui.named(Material.EXPERIENCE_BOTTLE, "&aรับ XP",
                 "&7XP สะสม: &f" + PointsManager.format(d.xp), " ", "&eคลิกเพื่อรับ XP"));
         inv.setItem(12, Gui.named(Material.CHEST, "&eดูของที่ผลิตได้",

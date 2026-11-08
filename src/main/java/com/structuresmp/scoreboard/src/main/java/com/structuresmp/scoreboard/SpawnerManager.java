@@ -57,6 +57,8 @@ public final class SpawnerManager implements Listener {
         public long xp;
         public long mobs;
         public long produced;
+        /** จำนวนกรงที่ซ้อนกัน (อย่างน้อย 1, สูงสุดตาม config) */
+        public int stack = 1;
         public final Map<Material, Long> storage = new LinkedHashMap<>();
 
         SpawnerData(String world, int x, int y, int z, EntityType type, UUID owner, String ownerName) {
@@ -154,6 +156,7 @@ public final class SpawnerManager implements Listener {
         plugin.getConfig().addDefault("spawners.mobs-per-cycle", 3);
         plugin.getConfig().addDefault("spawners.max-storage", 20000);
         plugin.getConfig().addDefault("spawners.sell-multiplier", 1.0);
+        plugin.getConfig().addDefault("spawners.max-stack", 10000);
         // ขุดกรงธรรมชาติ
         plugin.getConfig().addDefault("spawners.natural-break", true);
         plugin.getConfig().addDefault("spawners.require-silk-touch", true);
@@ -212,6 +215,10 @@ public final class SpawnerManager implements Listener {
 
     public double sellMultiplier() {
         return Math.max(0, plugin.getConfig().getDouble("spawners.sell-multiplier", 1.0));
+    }
+
+    public int maxStack() {
+        return Math.max(1, plugin.getConfig().getInt("spawners.max-stack", 10000));
     }
 
     public double valueOf(SpawnerData data) {
@@ -283,11 +290,13 @@ public final class SpawnerManager implements Listener {
             Table t = TABLES.get(data.type);
             if (t == null) continue;
 
-            int mobs = Math.max(1, (int) Math.round(base * t.rate()));
+            int stack = Math.max(1, data.stack);
+            // จำนวนม็อบต่อรอบ × จำนวนกรงที่ซ้อน
+            int mobs = Math.max(1, (int) Math.round(base * t.rate() * stack));
             long stored = data.stored();
+            data.mobs += mobs;
+            data.xp += (long) t.xp() * mobs;
             for (int i = 0; i < mobs; i++) {
-                data.mobs++;
-                data.xp += t.xp();
                 for (Drop dr : t.drops()) {
                     if (rnd.nextDouble() > dr.chance()) continue;
                     long n = dr.min() + rnd.nextInt(dr.max() - dr.min() + 1);
@@ -349,7 +358,17 @@ public final class SpawnerManager implements Listener {
             spawners.remove(key(b));
             dirty = true;
             if (data.xp > 0) p.giveExp((int) Math.min(data.xp, 2_000_000_000L));
-            b.getWorld().dropItemNaturally(b.getLocation().add(0.5, 0.5, 0.5), createItem(data.type));
+            // ดรอปตามจำนวนที่ซ้อน
+            int amount = Math.max(1, data.stack);
+            ItemStack drop = createItem(data.type);
+            // ดรอปเป็นกองๆ (สูงสุด 64 ต่อกอง)
+            while (amount > 0) {
+                int n = Math.min(64, amount);
+                ItemStack stack = drop.clone();
+                stack.setAmount(n);
+                b.getWorld().dropItemNaturally(b.getLocation().add(0.5, 0.5, 0.5), stack);
+                amount -= n;
+            }
             save();
             return;
         }
@@ -401,6 +420,7 @@ public final class SpawnerManager implements Listener {
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
     public void onInteract(PlayerInteractEvent e) {
         if (e.getAction() != Action.RIGHT_CLICK_BLOCK) return;
+        if (e.getHand() != EquipmentSlot.HAND) return;
         Block b = e.getClickedBlock();
         if (b == null || b.getType() != Material.SPAWNER) return;
         SpawnerData data = spawners.get(key(b));
@@ -408,11 +428,38 @@ public final class SpawnerManager implements Listener {
 
         Player p = e.getPlayer();
         ItemStack hand = p.getInventory().getItemInMainHand();
+
+        // ----- ซ้อนกรง: ย่อ + ถือกรงประเภทเดียวกัน -----
+        if (p.isSneaking() && hand.getType() == Material.SPAWNER) {
+            EntityType heldType = typeOf(hand);
+            if (heldType != null && heldType == data.type) {
+                e.setCancelled(true);
+                if (!canManage(p, data)) {
+                    p.sendMessage(Text.c("&cสปาวเนอร์นี้เป็นของ " + data.ownerName));
+                    return;
+                }
+                int max = maxStack();
+                if (data.stack >= max) {
+                    p.sendMessage(Text.c("&cกรงนี้ซ้อนครบ " + max + " แล้ว"));
+                    return;
+                }
+                // ซ้อนทีละ 1 จากมือ
+                data.stack++;
+                hand.setAmount(hand.getAmount() - 1);
+                dirty = true;
+                save();
+                p.sendMessage(Text.c(PURPLE + "ซ้อนกรงแล้ว &f" + data.stack + "/" + max + " &7(" + typeName(data.type) + ")"));
+                return;
+            }
+            // กรงคนละประเภท หรือไม่มี typeKey → ปล่อยให้วางบล็อกตามปกติ
+            return;
+        }
+
+        // ย่อ + ถือของอื่น → ปล่อยให้วางบล็อกทับข้างๆ
         boolean egg = hand.getType().name().endsWith("_SPAWN_EGG");
-        if (p.isSneaking() && !hand.getType().isAir() && !egg) return; // let players place blocks against it
+        if (p.isSneaking() && !hand.getType().isAir() && !egg) return;
 
         e.setCancelled(true);
-        if (e.getHand() != EquipmentSlot.HAND) return;
         if (!canManage(p, data)) {
             p.sendMessage(Text.c("&cสปาวเนอร์นี้เป็นของ " + data.ownerName));
             return;
@@ -454,6 +501,7 @@ public final class SpawnerManager implements Listener {
                 data.xp = s.getLong("xp");
                 data.mobs = s.getLong("mobs");
                 data.produced = s.getLong("produced");
+                data.stack = Math.max(1, s.getInt("stack", 1));
                 ConfigurationSection st = s.getConfigurationSection("storage");
                 if (st != null) {
                     for (String name : st.getKeys(false)) {
@@ -484,6 +532,7 @@ public final class SpawnerManager implements Listener {
             yml.set(base + ".xp", data.xp);
             yml.set(base + ".mobs", data.mobs);
             yml.set(base + ".produced", data.produced);
+            yml.set(base + ".stack", Math.max(1, data.stack));
             for (Map.Entry<Material, Long> e : data.storage.entrySet()) {
                 yml.set(base + ".storage." + e.getKey().name(), e.getValue());
             }
