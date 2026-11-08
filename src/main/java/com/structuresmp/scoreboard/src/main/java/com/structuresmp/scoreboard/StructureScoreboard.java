@@ -66,6 +66,7 @@ public final class StructureScoreboard extends JavaPlugin implements Listener, C
     private CodeManager codes;
     private BountyManager bounty;
     private TabListManager tabList;
+    private RankManager ranks;
     private HomeManager homes;
     private SpecialTools specialTools;
 
@@ -144,7 +145,9 @@ public final class StructureScoreboard extends JavaPlugin implements Listener, C
         codes = new CodeManager(this, economy, points);
         bounty = new BountyManager(this, economy);
         tabList = new TabListManager(this);
-        homes = new HomeManager(this, combat);
+        ranks = new RankManager(this, economy);
+        ranks.reload();
+        homes = new HomeManager(this, combat, ranks);
         specialTools = new SpecialTools(this);
 
         Commands commands = new Commands(economy, points, prices, shopGui, sellGui, auctionGui, orderGui, rtp);
@@ -163,6 +166,13 @@ public final class StructureScoreboard extends JavaPlugin implements Listener, C
         for (String name : new String[] {"ec", "nv"}) {
             PluginCommand pc = getCommand(name);
             if (pc != null) pc.setExecutor(utility);
+        }
+        for (String name : new String[] {"rank", "setrank"}) {
+            PluginCommand pc = getCommand(name);
+            if (pc != null) {
+                pc.setExecutor(ranks);
+                pc.setTabCompleter(ranks);
+            }
         }
         for (String name : new String[] {"sethome", "home", "delhome", "homes"}) {
             PluginCommand pc = getCommand(name);
@@ -184,6 +194,7 @@ public final class StructureScoreboard extends JavaPlugin implements Listener, C
         getServer().getPluginManager().registerEvents(spawnerGui, this);
         getServer().getPluginManager().registerEvents(specialShop, this);
         getServer().getPluginManager().registerEvents(bounty, this);
+        getServer().getPluginManager().registerEvents(ranks, this);
         getServer().getPluginManager().registerEvents(specialTools, this);
 
         loadSettings();
@@ -201,6 +212,7 @@ public final class StructureScoreboard extends JavaPlugin implements Listener, C
         if (spawnerMgr != null) spawnerMgr.stop();
         if (bounty != null) bounty.stop();
         if (tabList != null) tabList.stop();
+        if (ranks != null) ranks.stop();
         if (task != null) task.cancel();
         if (titleTask != null) titleTask.cancel();
         for (Player p : Bukkit.getOnlinePlayers()) remove(p);

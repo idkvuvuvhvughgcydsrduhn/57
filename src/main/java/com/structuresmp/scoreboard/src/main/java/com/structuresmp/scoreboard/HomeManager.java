@@ -43,27 +43,27 @@ public final class HomeManager implements TabExecutor {
 
     private final JavaPlugin plugin;
     private final CombatManager combat;
+    private final RankManager rankManager;
     private final File file;
     private final Map<UUID, Map<String, Home>> homes = new HashMap<>();
     private final Map<UUID, BukkitTask> pending = new HashMap<>();
 
-    public HomeManager(JavaPlugin plugin, CombatManager combat) {
+    public HomeManager(JavaPlugin plugin, CombatManager combat, RankManager rankManager) {
         this.plugin = plugin;
         this.combat = combat;
+        this.rankManager = rankManager;
         this.file = new File(plugin.getDataFolder(), "homes.yml");
         load();
     }
 
     public void reload() {
-        plugin.getConfig().addDefault("homes.max-per-player", 3);
         plugin.getConfig().addDefault("homes.teleport-delay-seconds", 3);
         plugin.getConfig().options().copyDefaults(true);
         plugin.saveConfig();
     }
 
     private int maxHomes(Player p) {
-        if (p.hasPermission("structuresmp.admin")) return Integer.MAX_VALUE; // OPs have no limit
-        return Math.max(1, plugin.getConfig().getInt("homes.max-per-player", 3));
+        return rankManager.maxHomes(p);
     }
 
     // ------------------------------------------------------------------ storage
