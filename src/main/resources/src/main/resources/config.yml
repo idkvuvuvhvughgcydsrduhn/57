@@ -23,40 +23,40 @@ ranks:
   list:
     owner:
       display: Owner
-      color: "&#FFAA00"
+      color: "&6"
       weight: 100
       max-homes: -1
     co-owner:
       display: Co-Owner
-      color: "&#FF8C2A"
+      color: "&6"
       weight: 90
       max-homes: 30
     admin:
       display: Admin
-      color: "&#FF3333"
+      color: "&c"
       weight: 80
       max-homes: 20
     staff:
       display: Staff
-      color: "&#3399FF"
+      color: "&b"
       weight: 60
       max-homes: 12
     media:
       display: Media
-      color: "&#FF69B4"
+      color: "&d"
       weight: 40
       max-homes: 8
     supporter:
       display: Supporter
-      color: "&#00D6A3"
+      color: "&a"
       weight: 30
       max-homes: 6
     member:
       display: Member
-      color: "&#8B5CF6"
+      color: "&5"
       weight: 10
       max-homes: 3
-
+      
 # กรงสปาวเนอร์
 spawners:
   cycle-seconds: 10
