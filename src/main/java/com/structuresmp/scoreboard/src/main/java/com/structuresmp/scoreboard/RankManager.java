@@ -76,14 +76,15 @@ public final class RankManager implements Listener, TabExecutor {
         plugin.getConfig().addDefault("ranks.prefix-format", "%color%&l[%display%]&r ");
         plugin.getConfig().addDefault("ranks.chat-enabled", true);
         plugin.getConfig().addDefault("ranks.chat-format", "%rank%&f%name%&7: &f%message%");
-        // สี hex หลีกเลี่ยงลงท้าย 0 ติดชื่อ (กันพาร์เซอร์กินตัวอักษร)
-        defaultRank("owner", "Owner", "&#FFAA00", 100, -1);
-        defaultRank("co-owner", "Co-Owner", "&#FF8C2A", 90, 30);
-        defaultRank("admin", "Admin", "&#FF3333", 80, 20);
-        defaultRank("staff", "Staff", "&#3399FF", 60, 12);
-        defaultRank("media", "Media", "&#FF69B4", 40, 8);
-        defaultRank("supporter", "Supporter", "&#00D6A3", 30, 6);
-        defaultRank("member", "Member", "&#8B5CF6", 10, 3);
+        // ใช้สี legacy (&6 &c ...) เป็นหลัก — เสถียรทั้ง Java/Bedrock ไม่พังเป็น 0wner
+        // ถ้าอยากใช้ hex ใส่ใน config ได้ แต่ต้องไม่ให้ตัวเลขท้ายสีติดชื่อ
+        defaultRank("owner", "Owner", "&6", 100, -1);
+        defaultRank("co-owner", "Co-Owner", "&6", 90, 30);
+        defaultRank("admin", "Admin", "&c", 80, 20);
+        defaultRank("staff", "Staff", "&b", 60, 12);
+        defaultRank("media", "Media", "&d", 40, 8);
+        defaultRank("supporter", "Supporter", "&a", 30, 6);
+        defaultRank("member", "Member", "&5", 10, 3);
         plugin.getConfig().options().copyDefaults(true);
         plugin.saveConfig();
 
@@ -137,14 +138,13 @@ public final class RankManager implements Listener, TabExecutor {
     /** Coloured rank name for the scoreboard, e.g. gold "Owner". */
     public String coloredName(Player p) {
         Rank r = rankOf(p);
-        // ใส่ &l หลังสี hex เพื่อกันพาร์เซอร์กินตัวอักษรแรกของชื่อ (Owner → 0wner)
         return r.color() + "&l" + r.display();
     }
 
     public String prefixOf(Rank r) {
-        // บังคับมี &l หลังสีเสมอ กัน hex ลงท้าย 0 กินตัวอักษรของชื่อยศ
         String fmt = prefixFormat;
-        if (!fmt.contains("%color%&l") && !fmt.contains("%color%&L")) {
+        // ถ้า format ไม่มี &l หลังสี ให้ใส่ให้ กันตัวเลขท้าย hex กินชื่อ
+        if (!fmt.contains("%color%&") && !fmt.contains("%color%§")) {
             fmt = fmt.replace("%color%", "%color%&l");
         }
         return fmt.replace("%color%", r.color()).replace("%display%", r.display());
@@ -205,14 +205,13 @@ public final class RankManager implements Listener, TabExecutor {
             }
 
             Component prefix = Text.c(prefixOf(r));
-            // Always keep prefix in sync (rank color/display can change on reload)
             team.prefix(prefix);
             team.suffix(Component.empty());
 
             String entry = t.getName();
             Team current = sb.getEntryTeam(entry);
             if (current != null && current.getName().equals(name)) {
-                continue; // already correct
+                continue;
             }
             if (current != null) {
                 if (!current.getName().startsWith("rk")) {
@@ -224,16 +223,30 @@ public final class RankManager implements Listener, TabExecutor {
         }
     }
 
-    /** Every viewer (our sidebar board or the main scoreboard) gets the rank teams. */
+    /** ตั้งชื่อใน TAB ให้มียศ (ทำงานทั้ง Java และ Bedrock) */
+    private void applyPlayerListName(Player p) {
+        Rank r = rankOf(p);
+        // [Owner] Name — ใช้ Component ตรง ๆ ไม่ผ่าน legacy ที่พัง hex
+        Component listName = Text.c(prefixOf(r)).append(Component.text(p.getName()));
+        p.playerListName(listName);
+    }
+
+    /** Every viewer gets rank teams + player list names. */
     public void refreshAll() {
         for (Player viewer : Bukkit.getOnlinePlayers()) {
             applyTo(viewer.getScoreboard());
+            applyPlayerListName(viewer);
         }
     }
 
     @EventHandler
     public void onJoin(PlayerJoinEvent e) {
-        Bukkit.getScheduler().runTaskLater(plugin, this::refreshAll, 5L);
+        Player p = e.getPlayer();
+        // หน่วงนิดหน่อยให้ scoreboard ของ sidebar ถูกสร้างก่อน
+        Bukkit.getScheduler().runTaskLater(plugin, () -> {
+            refreshAll();
+            applyPlayerListName(p);
+        }, 5L);
     }
 
     @EventHandler
