@@ -76,15 +76,35 @@ public final class RankManager implements Listener, TabExecutor {
         plugin.getConfig().addDefault("ranks.prefix-format", "%color%&l[%display%]&r ");
         plugin.getConfig().addDefault("ranks.chat-enabled", true);
         plugin.getConfig().addDefault("ranks.chat-format", "%rank%&f%name%&7: &f%message%");
-        // ใช้สี legacy (&6 &c ...) เป็นหลัก — เสถียรทั้ง Java/Bedrock ไม่พังเป็น 0wner
-        // ถ้าอยากใช้ hex ใส่ใน config ได้ แต่ต้องไม่ให้ตัวเลขท้ายสีติดชื่อ
+        // ใช้สี legacy — เสถียรทั้ง Java/Bedrock
+        // Staff hierarchy
         defaultRank("owner", "Owner", "&6", 100, -1);
-        defaultRank("co-owner", "Co-Owner", "&6", 90, 30);
-        defaultRank("admin", "Admin", "&c", 80, 20);
-        defaultRank("staff", "Staff", "&b", 60, 12);
-        defaultRank("media", "Media", "&d", 40, 8);
-        defaultRank("supporter", "Supporter", "&a", 30, 6);
-        defaultRank("member", "Member", "&5", 10, 3);
+        defaultRank("co-owner", "Co-Owner", "&6", 98, 50);
+        defaultRank("manager", "Manager", "&5", 95, 40);
+        defaultRank("head-admin", "Head-Admin", "&c", 92, 35);
+        defaultRank("admin", "Admin", "&c", 88, 30);
+        defaultRank("developer", "Developer", "&b", 85, 30);
+        defaultRank("trial-admin", "Trial-Admin", "&c", 80, 20);
+        defaultRank("moderator", "Moderator", "&2", 75, 18);
+        defaultRank("trial-mod", "Trial-Mod", "&a", 70, 15);
+        defaultRank("helper", "Helper", "&a", 65, 12);
+        defaultRank("staff", "Staff", "&9", 60, 12);
+        // Partners / creators
+        defaultRank("partner", "Partner", "&d", 55, 15);
+        defaultRank("famous", "Famous", "&d", 52, 12);
+        defaultRank("streamer", "Streamer", "&5", 50, 12);
+        defaultRank("youtuber", "YouTuber", "&c", 48, 12);
+        defaultRank("tiktoker", "TikToker", "&d", 46, 12);
+        defaultRank("media", "Media", "&d", 44, 10);
+        // Donator ranks
+        defaultRank("titan", "TITAN", "&4", 40, 20);
+        defaultRank("elite", "ELITE", "&b", 36, 16);
+        defaultRank("mvp+", "MVP+", "&6", 32, 14);
+        defaultRank("mvp", "MVP", "&b", 28, 12);
+        defaultRank("vip+", "VIP+", "&a", 24, 10);
+        defaultRank("vip", "VIP", "&a", 20, 8);
+        defaultRank("supporter", "Supporter", "&a", 15, 6);
+        defaultRank("member", "Member", "&7", 10, 3);
         plugin.getConfig().options().copyDefaults(true);
         plugin.saveConfig();
 
