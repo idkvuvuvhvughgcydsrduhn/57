@@ -18,9 +18,10 @@ lines:
 ranks:
   default: member
   prefix-format: "%color%&l[%display%]&r "
-  chat-enabled: true
+  chat-enabled: false
   chat-format: "%rank%&f%name%&7: &f%message%"
   list:
+    # ===== Staff =====
     owner:
       display: Owner
       color: "&6"
@@ -29,31 +30,123 @@ ranks:
     co-owner:
       display: Co-Owner
       color: "&6"
-      weight: 90
-      max-homes: 30
+      weight: 98
+      max-homes: 50
+    manager:
+      display: Manager
+      color: "&5"
+      weight: 95
+      max-homes: 40
+    head-admin:
+      display: Head-Admin
+      color: "&c"
+      weight: 92
+      max-homes: 35
     admin:
       display: Admin
       color: "&c"
+      weight: 88
+      max-homes: 30
+    developer:
+      display: Developer
+      color: "&b"
+      weight: 85
+      max-homes: 30
+    trial-admin:
+      display: Trial-Admin
+      color: "&c"
       weight: 80
       max-homes: 20
+    moderator:
+      display: Moderator
+      color: "&2"
+      weight: 75
+      max-homes: 18
+    trial-mod:
+      display: Trial-Mod
+      color: "&a"
+      weight: 70
+      max-homes: 15
+    helper:
+      display: Helper
+      color: "&a"
+      weight: 65
+      max-homes: 12
     staff:
       display: Staff
-      color: "&b"
+      color: "&9"
       weight: 60
+      max-homes: 12
+    # ===== Partner / Creator =====
+    partner:
+      display: Partner
+      color: "&d"
+      weight: 55
+      max-homes: 15
+    famous:
+      display: Famous
+      color: "&d"
+      weight: 52
+      max-homes: 12
+    streamer:
+      display: Streamer
+      color: "&5"
+      weight: 50
+      max-homes: 12
+    youtuber:
+      display: YouTuber
+      color: "&c"
+      weight: 48
+      max-homes: 12
+    tiktoker:
+      display: TikToker
+      color: "&d"
+      weight: 46
       max-homes: 12
     media:
       display: Media
       color: "&d"
+      weight: 44
+      max-homes: 10
+    # ===== Donator =====
+    titan:
+      display: TITAN
+      color: "&4"
       weight: 40
+      max-homes: 20
+    elite:
+      display: ELITE
+      color: "&b"
+      weight: 36
+      max-homes: 16
+    mvp+:
+      display: MVP+
+      color: "&6"
+      weight: 32
+      max-homes: 14
+    mvp:
+      display: MVP
+      color: "&b"
+      weight: 28
+      max-homes: 12
+    vip+:
+      display: VIP+
+      color: "&a"
+      weight: 24
+      max-homes: 10
+    vip:
+      display: VIP
+      color: "&a"
+      weight: 20
       max-homes: 8
     supporter:
       display: Supporter
       color: "&a"
-      weight: 30
+      weight: 15
       max-homes: 6
     member:
       display: Member
-      color: "&5"
+      color: "&7"
       weight: 10
       max-homes: 3
       
