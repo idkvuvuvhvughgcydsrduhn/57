@@ -1,5 +1,5 @@
 name: StructureScoreboard
-version: 1.11.0
+version: 1.12.0
 main: com.structuresmp.scoreboard.StructureScoreboard
 api-version: "1.21"
 description: Scoreboard, economy, shop, auction house, orders and RTP for Structure SMP
@@ -108,6 +108,10 @@ commands:
     description: Set a player's rank
     usage: /setrank <player> <rank>
     permission: structuresmp.admin
+  repair:
+    description: Repair the item in your hand
+    usage: /repair
+    aliases: [fix]
 
 permissions:
   structuresmp.admin:
