@@ -70,6 +70,7 @@ public final class StructureScoreboard extends JavaPlugin implements Listener, C
     private RankManager ranks;
     private HomeManager homes;
     private SpecialTools specialTools;
+    private RepairGui repairGui;
 
     private BukkitTask task;
     private BukkitTask titleTask;
@@ -150,6 +151,7 @@ public final class StructureScoreboard extends JavaPlugin implements Listener, C
         ranks.reload();
         homes = new HomeManager(this, combat, ranks);
         specialTools = new SpecialTools(this);
+        repairGui = new RepairGui(this, economy, prices);
 
         Commands commands = new Commands(economy, points, prices, shopGui, sellGui, auctionGui, orderGui, rtp);
         for (String name : new String[] {"bal", "pay", "points", "addmoney", "removemoney", "addpoint", "removepoint",
@@ -183,6 +185,8 @@ public final class StructureScoreboard extends JavaPlugin implements Listener, C
             PluginCommand pc = getCommand(name);
             if (pc != null) pc.setExecutor(specialTools);
         }
+        PluginCommand repairCommand = getCommand("repair");
+        if (repairCommand != null) repairCommand.setExecutor(repairGui);
 
         getServer().getPluginManager().registerEvents(this, this);
         getServer().getPluginManager().registerEvents(shopGui, this);
@@ -197,6 +201,7 @@ public final class StructureScoreboard extends JavaPlugin implements Listener, C
         getServer().getPluginManager().registerEvents(bounty, this);
         getServer().getPluginManager().registerEvents(ranks, this);
         getServer().getPluginManager().registerEvents(specialTools, this);
+        getServer().getPluginManager().registerEvents(repairGui, this);
 
         loadSettings();
         Bukkit.getScheduler().runTaskTimer(this, () -> {
@@ -237,6 +242,7 @@ public final class StructureScoreboard extends JavaPlugin implements Listener, C
         if (ranks != null) ranks.reload();
         homes.reload();
         specialTools.reload();
+        if (repairGui != null) repairGui.reload();
 
         title = getConfig().getString("title", "&d&lStructure Smp");
         lines = getConfig().getStringList("lines");
