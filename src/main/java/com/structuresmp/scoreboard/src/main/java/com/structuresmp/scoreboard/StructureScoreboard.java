@@ -72,6 +72,7 @@ public final class StructureScoreboard extends JavaPlugin implements Listener, C
     private SpecialTools specialTools;
     private RepairGui repairGui;
     private AntiEspManager antiEsp;
+    private TpaManager tpa;
 
     private BukkitTask task;
     private BukkitTask titleTask;
@@ -154,6 +155,7 @@ public final class StructureScoreboard extends JavaPlugin implements Listener, C
         specialTools = new SpecialTools(this);
         repairGui = new RepairGui(this, economy, prices);
         antiEsp = new AntiEspManager(this);
+        tpa = new TpaManager(this, combat);
 
         Commands commands = new Commands(economy, points, prices, shopGui, sellGui, auctionGui, orderGui, rtp);
         for (String name : new String[] {"bal", "pay", "points", "addmoney", "removemoney", "addpoint", "removepoint",
@@ -189,6 +191,10 @@ public final class StructureScoreboard extends JavaPlugin implements Listener, C
         }
         PluginCommand repairCommand = getCommand("repair");
         if (repairCommand != null) repairCommand.setExecutor(repairGui);
+        for (String name : new String[] {"tpa", "tpahere", "tpaccept", "tpdeny", "tpacancel", "tpatoggle"}) {
+            PluginCommand pc = getCommand(name);
+            if (pc != null) pc.setExecutor(tpa);
+        }
 
         getServer().getPluginManager().registerEvents(this, this);
         getServer().getPluginManager().registerEvents(shopGui, this);
@@ -205,6 +211,7 @@ public final class StructureScoreboard extends JavaPlugin implements Listener, C
         getServer().getPluginManager().registerEvents(specialTools, this);
         getServer().getPluginManager().registerEvents(repairGui, this);
         getServer().getPluginManager().registerEvents(antiEsp, this);
+        getServer().getPluginManager().registerEvents(tpa, this);
 
         loadSettings();
         Bukkit.getScheduler().runTaskTimer(this, () -> {
@@ -248,6 +255,7 @@ public final class StructureScoreboard extends JavaPlugin implements Listener, C
         specialTools.reload();
         if (repairGui != null) repairGui.reload();
         if (antiEsp != null) antiEsp.reload();
+        tpa.reload();
 
         title = getConfig().getString("title", "&d&lStructure Smp");
         lines = getConfig().getStringList("lines");

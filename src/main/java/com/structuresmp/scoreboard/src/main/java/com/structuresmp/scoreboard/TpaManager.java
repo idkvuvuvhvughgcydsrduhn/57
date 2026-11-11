@@ -8,7 +8,6 @@ import org.bukkit.Location;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandSender;
 import org.bukkit.command.TabExecutor;
-import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
@@ -16,8 +15,6 @@ import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.scheduler.BukkitTask;
 
-import java.io.File;
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -30,66 +27,45 @@ import java.util.UUID;
 
 /**
  * Teleport requests.
- *  /tpa <player>      - ask to teleport to a player
- *  /tpahere <player>  - ask a player to teleport to you
- *  /tpaccept [player], /tpdeny [player], /tpcancel, /tpatoggle
+ *  /tpa <player>      ask to teleport TO that player
+ *  /tpahere <player>  ask that player to teleport to YOU
+ *  /tpaccept [player], /tpdeny [player], /tpacancel
  */
 public final class TpaManager implements Listener, TabExecutor {
 
     private static final String PURPLE = "&#A855F7";
     private static final String LIGHT = "&#D8B4FE";
 
-    private record Request(UUID from, boolean here, long expires) {
+    private static final class Request {
+        final UUID from;
+        final UUID to;
+        final boolean here; // true = /tpahere (the receiver teleports to the sender)
+        final long expires;
+
+        Request(UUID from, UUID to, boolean here, long expires) {
+            this.from = from;
+            this.to = to;
+            this.here = here;
+            this.expires = expires;
+        }
     }
 
     private final JavaPlugin plugin;
     private final CombatManager combat;
-    private final File file;
-    private final Map<UUID, Map<UUID, Request>> incoming = new HashMap<>(); // target -> (requester -> request)
-    private final Map<UUID, Long> lastRequest = new HashMap<>();
-    private final Map<UUID, BukkitTask> moving = new HashMap<>();           // players waiting to be teleported
-    private final Set<UUID> disabled = new HashSet<>();                      // players who turned requests off
+    private final Map<UUID, LinkedHashMap<UUID, Request>> incoming = new HashMap<>(); // receiver -> (sender -> request)
+    private final Map<UUID, BukkitTask> pendingTeleports = new HashMap<>();
+    private final Set<UUID> disabled = new HashSet<>(); // players who turned requests off (/tpatoggle)
 
     public TpaManager(JavaPlugin plugin, CombatManager combat) {
         this.plugin = plugin;
         this.combat = combat;
-        this.file = new File(plugin.getDataFolder(), "tpa.yml");
-        load();
     }
 
     public void reload() {
         plugin.getConfig().addDefault("tpa.request-timeout-seconds", 60);
         plugin.getConfig().addDefault("tpa.teleport-delay-seconds", 3);
-        plugin.getConfig().addDefault("tpa.cooldown-seconds", 5);
         plugin.getConfig().options().copyDefaults(true);
         plugin.saveConfig();
-    }
-
-    // ------------------------------------------------------------------ storage (who turned requests off)
-
-    private void load() {
-        if (!file.exists()) return;
-        YamlConfiguration yml = YamlConfiguration.loadConfiguration(file);
-        for (String id : yml.getStringList("disabled")) {
-            try {
-                disabled.add(UUID.fromString(id));
-            } catch (IllegalArgumentException ignored) {
-                // skip broken entries
-            }
-        }
-    }
-
-    private void save() {
-        YamlConfiguration yml = new YamlConfiguration();
-        List<String> ids = new ArrayList<>();
-        for (UUID id : disabled) ids.add(id.toString());
-        yml.set("disabled", ids);
-        try {
-            plugin.getDataFolder().mkdirs();
-            yml.save(file);
-        } catch (IOException ex) {
-            plugin.getLogger().warning("Could not save tpa.yml: " + ex.getMessage());
-        }
     }
 
     // ------------------------------------------------------------------ commands
@@ -101,11 +77,11 @@ public final class TpaManager implements Listener, TabExecutor {
             return true;
         }
         switch (cmd.getName().toLowerCase(Locale.ROOT)) {
-            case "tpa" -> send(p, args, false);
-            case "tpahere" -> send(p, args, true);
+            case "tpa" -> sendRequest(p, args, false);
+            case "tpahere" -> sendRequest(p, args, true);
             case "tpaccept" -> accept(p, args);
             case "tpdeny" -> deny(p, args);
-            case "tpcancel" -> cancel(p);
+            case "tpacancel" -> cancel(p);
             case "tpatoggle" -> toggle(p);
             default -> {
                 return false;
@@ -114,166 +90,159 @@ public final class TpaManager implements Listener, TabExecutor {
         return true;
     }
 
-    private void send(Player p, String[] args, boolean here) {
+    private void sendRequest(Player from, String[] args, boolean here) {
+        String cmdName = here ? "tpahere" : "tpa";
         if (args.length < 1) {
-            p.sendMessage(Text.c("&eใช้: &f/" + (here ? "tpahere" : "tpa") + " <ผู้เล่น>"));
+            from.sendMessage(Text.c("&eใช้: &f/" + cmdName + " <ผู้เล่น>"));
             return;
         }
         Player target = Bukkit.getPlayerExact(args[0]);
         if (target == null) {
-            p.sendMessage(Text.c("&cไม่พบผู้เล่นออนไลน์ชื่อ " + args[0]));
+            from.sendMessage(Text.c("&cไม่พบผู้เล่นที่ออนไลน์ชื่อ " + args[0]));
             return;
         }
-        if (target.equals(p)) {
-            p.sendMessage(Text.c("&cส่งคำขอหาตัวเองไม่ได้"));
-            return;
-        }
-        if (combat.isInCombat(p)) {
-            p.sendMessage(Text.c(PURPLE + "ใช้คำสั่งนี้ไม่ได้ขณะ Combat"));
+        if (target.equals(from)) {
+            from.sendMessage(Text.c("&cส่งคำขอหาตัวเองไม่ได้"));
             return;
         }
         if (disabled.contains(target.getUniqueId())) {
-            p.sendMessage(Text.c("&c" + target.getName() + " ปิดรับคำขอวาร์ปอยู่"));
+            from.sendMessage(Text.c("&c" + target.getName() + " ปิดรับคำขอวาร์ปอยู่"));
+            return;
+        }
+        if (combat.isInCombat(from)) {
+            from.sendMessage(Text.c(PURPLE + "ใช้ /" + cmdName + " ไม่ได้ขณะ Combat"));
             return;
         }
 
-        long now = System.currentTimeMillis();
-        long cooldown = Math.max(0, plugin.getConfig().getInt("tpa.cooldown-seconds", 5)) * 1000L;
-        Long last = lastRequest.get(p.getUniqueId());
-        if (last != null && now - last < cooldown) {
-            p.sendMessage(Text.c("&cรอ " + ((cooldown - (now - last) + 999) / 1000) + " วินาทีก่อนส่งคำขออีกครั้ง"));
-            return;
-        }
-        lastRequest.put(p.getUniqueId(), now);
+        int timeout = Math.max(5, plugin.getConfig().getInt("tpa.request-timeout-seconds", 60));
+        Request r = new Request(from.getUniqueId(), target.getUniqueId(), here,
+                System.currentTimeMillis() + timeout * 1000L);
+        incoming.computeIfAbsent(target.getUniqueId(), k -> new LinkedHashMap<>()).put(from.getUniqueId(), r);
 
-        long timeout = Math.max(5, plugin.getConfig().getInt("tpa.request-timeout-seconds", 60));
-        Map<UUID, Request> map = incoming.computeIfAbsent(target.getUniqueId(), k -> new LinkedHashMap<>());
-        map.remove(p.getUniqueId()); // a new request replaces the old one and becomes the most recent
-        map.put(p.getUniqueId(), new Request(p.getUniqueId(), here, now + timeout * 1000L));
+        from.sendMessage(Text.c(PURPLE + "ส่งคำขอ" + (here ? "ให้ " + LIGHT + target.getName() + PURPLE + " วาร์ปมาหาคุณ"
+                : "วาร์ปไปหา " + LIGHT + target.getName()) + PURPLE + " แล้ว &7(หมดเวลาใน " + timeout + " วินาที)"));
 
-        p.sendMessage(Text.c(PURPLE + "ส่งคำขอ" + (here ? "ให้ " + LIGHT + target.getName() + PURPLE + " วาร์ปมาหาคุณ"
-                : "วาร์ปไปหา " + LIGHT + target.getName()) + PURPLE + " แล้ว &7(หมดอายุใน " + timeout
-                + " วินาที, ยกเลิกด้วย /tpcancel)"));
+        Component buttons = Text.c(PURPLE + LIGHT + from.getName() + PURPLE
+                + (here ? " ขอให้คุณวาร์ปไปหาเขา " : " ขอวาร์ปมาหาคุณ "))
+                .append(Text.c("&a&l[ยอมรับ]")
+                        .clickEvent(ClickEvent.runCommand("/tpaccept " + from.getName()))
+                        .hoverEvent(HoverEvent.showText(Text.c("&7คลิกเพื่อยอมรับ"))))
+                .append(Text.c(" "))
+                .append(Text.c("&c&l[ปฏิเสธ]")
+                        .clickEvent(ClickEvent.runCommand("/tpdeny " + from.getName()))
+                        .hoverEvent(HoverEvent.showText(Text.c("&7คลิกเพื่อปฏิเสธ"))));
+        target.sendMessage(buttons);
 
-        Component accept = Text.c("&a&l[ยอมรับ]")
-                .clickEvent(ClickEvent.runCommand("/tpaccept " + p.getName()))
-                .hoverEvent(HoverEvent.showText(Text.c("&7คลิกเพื่อยอมรับ")));
-        Component deny = Text.c("&c&l[ปฏิเสธ]")
-                .clickEvent(ClickEvent.runCommand("/tpdeny " + p.getName()))
-                .hoverEvent(HoverEvent.showText(Text.c("&7คลิกเพื่อปฏิเสธ")));
-        target.sendMessage(Text.c(LIGHT + p.getName() + PURPLE + (here ? " ขอให้คุณวาร์ปไปหาเขา" : " ขอวาร์ปมาหาคุณ"))
-                .append(Component.newline()).append(accept).append(Text.c(" ")).append(deny));
+        UUID fromId = from.getUniqueId();
+        UUID toId = target.getUniqueId();
+        Bukkit.getScheduler().runTaskLater(plugin, () -> {
+            Map<UUID, Request> map = incoming.get(toId);
+            if (map != null && map.get(fromId) == r) {
+                map.remove(fromId);
+                Player sender = Bukkit.getPlayer(fromId);
+                if (sender != null) sender.sendMessage(Text.c("&7คำขอวาร์ปของคุณหมดเวลาแล้ว"));
+            }
+        }, timeout * 20L);
     }
 
-    /** Pending, not-yet-expired requests for a player. */
-    private Map<UUID, Request> pending(UUID target) {
-        Map<UUID, Request> map = incoming.get(target);
-        if (map == null) return null;
-        long now = System.currentTimeMillis();
-        map.values().removeIf(r -> r.expires() < now);
-        if (map.isEmpty()) {
-            incoming.remove(target);
-            return null;
-        }
-        return map;
-    }
-
-    /** The named request, or the most recent one when no name is given. Returns null (and tells the player) if none. */
-    private Request pick(Player p, String[] args) {
-        Map<UUID, Request> map = pending(p.getUniqueId());
-        if (map == null) {
-            p.sendMessage(Text.c("&cไม่มีคำขอวาร์ปที่รออยู่"));
-            return null;
-        }
+    /** The request this command refers to: the named sender, or the newest one. */
+    private Request pick(Player target, String[] args) {
+        Map<UUID, Request> map = incoming.get(target.getUniqueId());
+        if (map == null || map.isEmpty()) return null;
         if (args.length > 0) {
-            Player from = Bukkit.getPlayerExact(args[0]);
-            Request r = from == null ? null : map.get(from.getUniqueId());
-            if (r == null) p.sendMessage(Text.c("&cไม่มีคำขอจาก " + args[0]));
-            return r;
+            Player named = Bukkit.getPlayerExact(args[0]);
+            return named == null ? null : map.get(named.getUniqueId());
         }
         Request last = null;
         for (Request r : map.values()) last = r;
         return last;
     }
 
-    private void accept(Player p, String[] args) {
-        Request r = pick(p, args);
-        if (r == null) return;
-        if (combat.isInCombat(p)) {
-            p.sendMessage(Text.c(PURPLE + "ใช้คำสั่งนี้ไม่ได้ขณะ Combat"));
+    private void accept(Player target, String[] args) {
+        Request r = pick(target, args);
+        if (r == null) {
+            target.sendMessage(Text.c("&cไม่มีคำขอวาร์ปที่รอคุณตอบอยู่"));
             return;
         }
-        Player requester = Bukkit.getPlayer(r.from());
-        pending(p.getUniqueId());
-        Map<UUID, Request> map = incoming.get(p.getUniqueId());
-        if (map != null) map.remove(r.from());
+        incoming.get(target.getUniqueId()).remove(r.from);
+        if (System.currentTimeMillis() > r.expires) {
+            target.sendMessage(Text.c("&cคำขอนี้หมดเวลาแล้ว"));
+            return;
+        }
+        Player requester = Bukkit.getPlayer(r.from);
         if (requester == null) {
-            p.sendMessage(Text.c("&cผู้ขอออกจากเกมไปแล้ว"));
+            target.sendMessage(Text.c("&cผู้ขอออกจากเกมไปแล้ว"));
             return;
         }
 
-        Player mover = r.here() ? p : requester;     // the one who gets teleported
-        Player target = r.here() ? requester : p;    // where they go
-        p.sendMessage(Text.c(PURPLE + "ยอมรับคำขอจาก " + LIGHT + requester.getName()));
-        requester.sendMessage(Text.c(LIGHT + p.getName() + PURPLE + " ยอมรับคำขอของคุณ"));
-        begin(mover, target);
+        Player mover = r.here ? target : requester;
+        Player dest = r.here ? requester : target;
+        if (combat.isInCombat(mover) || combat.isInCombat(dest)) {
+            target.sendMessage(Text.c(PURPLE + "วาร์ปไม่ได้ เพราะมีคนติด Combat"));
+            requester.sendMessage(Text.c(PURPLE + "วาร์ปไม่ได้ เพราะมีคนติด Combat"));
+            return;
+        }
+        target.sendMessage(Text.c(PURPLE + "ยอมรับคำขอของ " + LIGHT + requester.getName() + PURPLE + " แล้ว"));
+        requester.sendMessage(Text.c(LIGHT + target.getName() + PURPLE + " ยอมรับคำขอของคุณ"));
+        startTeleport(mover, dest);
     }
 
-    private void deny(Player p, String[] args) {
-        Request r = pick(p, args);
-        if (r == null) return;
-        Map<UUID, Request> map = incoming.get(p.getUniqueId());
-        if (map != null) map.remove(r.from());
-        p.sendMessage(Text.c(PURPLE + "ปฏิเสธคำขอแล้ว"));
-        Player requester = Bukkit.getPlayer(r.from());
-        if (requester != null) requester.sendMessage(Text.c("&c" + p.getName() + " ปฏิเสธคำขอวาร์ปของคุณ"));
+    private void deny(Player target, String[] args) {
+        Request r = pick(target, args);
+        if (r == null) {
+            target.sendMessage(Text.c("&cไม่มีคำขอวาร์ปที่รอคุณตอบอยู่"));
+            return;
+        }
+        incoming.get(target.getUniqueId()).remove(r.from);
+        target.sendMessage(Text.c(PURPLE + "ปฏิเสธคำขอแล้ว"));
+        Player requester = Bukkit.getPlayer(r.from);
+        if (requester != null) {
+            requester.sendMessage(Text.c("&c" + target.getName() + " ปฏิเสธคำขอวาร์ปของคุณ"));
+        }
     }
 
     private void cancel(Player p) {
-        int removed = 0;
+        int n = 0;
         for (Map<UUID, Request> map : incoming.values()) {
-            if (map.remove(p.getUniqueId()) != null) removed++;
+            if (map.remove(p.getUniqueId()) != null) n++;
         }
-        p.sendMessage(Text.c(removed > 0 ? PURPLE + "ยกเลิกคำขอที่ส่งไปแล้ว" : "&cคุณไม่มีคำขอที่ส่งค้างอยู่"));
+        p.sendMessage(Text.c(n > 0 ? PURPLE + "ยกเลิกคำขอวาร์ป " + n + " รายการแล้ว" : "&7คุณไม่มีคำขอที่ส่งค้างอยู่"));
     }
 
     private void toggle(Player p) {
-        UUID id = p.getUniqueId();
-        if (disabled.remove(id)) {
+        if (disabled.remove(p.getUniqueId())) {
             p.sendMessage(Text.c(PURPLE + "เปิดรับคำขอวาร์ปแล้ว"));
         } else {
-            disabled.add(id);
-            incoming.remove(id);
-            p.sendMessage(Text.c(PURPLE + "ปิดรับคำขอวาร์ปแล้ว &7(พิมพ์ /tpatoggle อีกครั้งเพื่อเปิด)"));
+            disabled.add(p.getUniqueId());
+            p.sendMessage(Text.c(PURPLE + "ปิดรับคำขอวาร์ปแล้ว (คนอื่นส่งคำขอหาคุณไม่ได้)"));
         }
-        save();
     }
 
-    // ------------------------------------------------------------------ teleport
+    // ------------------------------------------------------------------ teleporting
 
-    /** The mover waits a few seconds without moving, then is teleported to the target player. */
-    private void begin(Player mover, Player target) {
-        if (combat.isInCombat(mover)) {
-            mover.sendMessage(Text.c(PURPLE + "วาร์ปไม่ได้ขณะ Combat"));
-            return;
-        }
+    private void startTeleport(Player mover, Player dest) {
         UUID id = mover.getUniqueId();
-        BukkitTask old = moving.remove(id);
+        BukkitTask old = pendingTeleports.remove(id);
         if (old != null) old.cancel();
 
         int delay = Math.max(0, plugin.getConfig().getInt("tpa.teleport-delay-seconds", 3));
         if (delay == 0) {
-            teleport(mover, target);
+            go(mover, dest);
             return;
         }
         Location from = mover.getLocation();
-        mover.sendMessage(Text.c(PURPLE + "วาร์ปไปหา " + LIGHT + target.getName() + PURPLE + " ใน " + delay
+        mover.sendMessage(Text.c(PURPLE + "วาร์ปไปหา " + LIGHT + dest.getName() + PURPLE + " ใน " + delay
                 + " วินาที &7อย่าขยับ"));
-        moving.put(id, Bukkit.getScheduler().runTaskLater(plugin, () -> {
-            moving.remove(id);
-            if (!mover.isOnline() || !target.isOnline()) return;
-            if (combat.isInCombat(mover)) {
-                mover.sendMessage(Text.c(PURPLE + "ยกเลิกวาร์ป เพราะคุณติด Combat"));
+        UUID destId = dest.getUniqueId();
+        pendingTeleports.put(id, Bukkit.getScheduler().runTaskLater(plugin, () -> {
+            pendingTeleports.remove(id);
+            Player d = Bukkit.getPlayer(destId);
+            if (!mover.isOnline() || d == null) {
+                mover.sendMessage(Text.c("&cยกเลิกวาร์ป เพราะผู้เล่นออกจากเกม"));
+                return;
+            }
+            if (combat.isInCombat(mover) || combat.isInCombat(d)) {
+                mover.sendMessage(Text.c(PURPLE + "ยกเลิกวาร์ป เพราะมีคนติด Combat"));
                 return;
             }
             Location now = mover.getLocation();
@@ -281,13 +250,13 @@ public final class TpaManager implements Listener, TabExecutor {
                 mover.sendMessage(Text.c("&cยกเลิกวาร์ป เพราะคุณขยับ"));
                 return;
             }
-            teleport(mover, target);
+            go(mover, d);
         }, delay * 20L));
     }
 
-    private void teleport(Player mover, Player target) {
-        mover.teleportAsync(target.getLocation()).thenAccept(ok -> Bukkit.getScheduler().runTask(plugin, () -> {
-            if (ok) mover.sendMessage(Text.c(PURPLE + "วาร์ปไปหา " + LIGHT + target.getName() + PURPLE + " แล้ว"));
+    private void go(Player mover, Player dest) {
+        mover.teleportAsync(dest.getLocation()).thenAccept(ok -> Bukkit.getScheduler().runTask(plugin, () -> {
+            if (ok) mover.sendMessage(Text.c(PURPLE + "วาร์ปสำเร็จ"));
             else mover.sendMessage(Text.c("&cวาร์ปไม่สำเร็จ ลองใหม่อีกครั้ง"));
         }));
     }
@@ -297,12 +266,9 @@ public final class TpaManager implements Listener, TabExecutor {
         UUID id = e.getPlayer().getUniqueId();
         incoming.remove(id);
         for (Map<UUID, Request> map : incoming.values()) map.remove(id);
-        lastRequest.remove(id);
-        BukkitTask t = moving.remove(id);
+        BukkitTask t = pendingTeleports.remove(id);
         if (t != null) t.cancel();
     }
-
-    // ------------------------------------------------------------------ tab completion
 
     @Override
     public List<String> onTabComplete(CommandSender sender, Command cmd, String label, String[] args) {
@@ -314,11 +280,11 @@ public final class TpaManager implements Listener, TabExecutor {
                 if (!online.equals(p)) out.add(online.getName());
             }
         } else if (name.equals("tpaccept") || name.equals("tpdeny")) {
-            Map<UUID, Request> map = pending(p.getUniqueId());
+            Map<UUID, Request> map = incoming.get(p.getUniqueId());
             if (map != null) {
                 for (UUID from : map.keySet()) {
-                    Player requester = Bukkit.getPlayer(from);
-                    if (requester != null) out.add(requester.getName());
+                    Player s = Bukkit.getPlayer(from);
+                    if (s != null) out.add(s.getName());
                 }
             }
         } else {
