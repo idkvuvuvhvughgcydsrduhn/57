@@ -1,5 +1,5 @@
 name: StructureScoreboard
-version: 1.12.0
+version: 1.15.0
 main: com.structuresmp.scoreboard.StructureScoreboard
 api-version: "1.21"
 description: Scoreboard, economy, shop, auction house, orders and RTP for Structure SMP
@@ -112,6 +112,28 @@ commands:
     description: Repair the item in your hand
     usage: /repair
     aliases: [fix]
+
+  tpa:
+    description: Ask to teleport to a player
+    usage: /tpa <player>
+  tpahere:
+    description: Ask a player to teleport to you
+    usage: /tpahere <player>
+  tpaccept:
+    description: Accept a teleport request
+    usage: /tpaccept [player]
+    aliases: [tpyes]
+  tpdeny:
+    description: Deny a teleport request
+    usage: /tpdeny [player]
+    aliases: [tpno]
+  tpacancel:
+    description: Cancel your teleport requests
+    usage: /tpacancel
+    aliases: [tpcancel]
+  tpatoggle:
+    description: Turn teleport requests on or off
+    usage: /tpatoggle
 
 permissions:
   structuresmp.admin:
