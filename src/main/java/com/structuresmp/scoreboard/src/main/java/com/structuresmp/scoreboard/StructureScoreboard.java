@@ -59,7 +59,6 @@ public final class StructureScoreboard extends JavaPlugin implements Listener, C
     private OrderGui orderGui;
     private RandomTeleport rtp;
     private CombatManager combat;
-    private MovementEffects effects;
     private HammerManager hammer;
     private SpawnerManager spawnerMgr;
     private SpawnerGui spawnerGui;
@@ -115,9 +114,6 @@ public final class StructureScoreboard extends JavaPlugin implements Listener, C
         getConfig().addDefault("combat.kill-on-quit", true);
         getConfig().addDefault("combat.blocked-commands", java.util.Arrays.asList(
                 "rtp", "wild", "spawn", "home", "homes", "tpa", "tpahere", "tpaccept", "warp", "back", "tp"));
-        getConfig().addDefault("effects.enabled", true);
-        getConfig().addDefault("effects.walk", true);
-        getConfig().addDefault("effects.sprint", true);
         getConfig().options().copyDefaults(true);
 
         // one-time switch of the scoreboard lines to the purple theme (with points)
@@ -135,7 +131,6 @@ public final class StructureScoreboard extends JavaPlugin implements Listener, C
         orders = new OrderManager(this);
         rtp = new RandomTeleport(this);
         combat = new CombatManager(this);
-        effects = new MovementEffects(this);
         hammer = new HammerManager(this);
         shopGui = new ShopGui(this, economy, prices);
         sellGui = new SellGui(this, economy, prices);
@@ -225,7 +220,6 @@ public final class StructureScoreboard extends JavaPlugin implements Listener, C
     public void onDisable() {
         if (sellGui != null) sellGui.closeAll(); // gives items back to players
         if (combat != null) combat.stop();
-        if (effects != null) effects.stop();
         if (spawnerMgr != null) spawnerMgr.stop();
         if (bounty != null) bounty.stop();
         if (tabList != null) tabList.stop();
@@ -245,7 +239,6 @@ public final class StructureScoreboard extends JavaPlugin implements Listener, C
         prices.load();
         rtp.reload();
         combat.reload();
-        effects.reload();
         hammer.reload();
         spawnerMgr.reload();
         specialShop.reload();
