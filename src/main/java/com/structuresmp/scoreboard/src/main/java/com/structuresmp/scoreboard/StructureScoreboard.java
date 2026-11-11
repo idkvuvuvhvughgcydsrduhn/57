@@ -155,6 +155,7 @@ public final class StructureScoreboard extends JavaPlugin implements Listener, C
         specialTools = new SpecialTools(this);
         repairGui = new RepairGui(this, economy, prices);
         antiEsp = new AntiEspManager(this);
+        antiEsp.setSpawnerSource(spawnerMgr);
         tpa = new TpaManager(this, combat);
 
         Commands commands = new Commands(economy, points, prices, shopGui, sellGui, auctionGui, orderGui, rtp);

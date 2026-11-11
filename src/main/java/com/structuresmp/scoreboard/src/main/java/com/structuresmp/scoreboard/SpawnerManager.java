@@ -233,6 +233,11 @@ public final class SpawnerManager implements Listener {
         return p.getUniqueId().equals(data.owner) || p.hasPermission("structuresmp.admin");
     }
 
+    /** Every placed cage (used by the anti-ESP to hide them from players who should not see them). */
+    public java.util.Collection<SpawnerData> all() {
+        return spawners.values();
+    }
+
     public void touch() {
         dirty = true;
     }
