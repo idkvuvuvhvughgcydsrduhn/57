@@ -71,6 +71,7 @@ public final class StructureScoreboard extends JavaPlugin implements Listener, C
     private SpecialTools specialTools;
     private RepairGui repairGui;
     private AntiEspManager antiEsp;
+    private CommandBlocker cmdBlocker;
     private TpaManager tpa;
 
     private BukkitTask task;
@@ -151,6 +152,7 @@ public final class StructureScoreboard extends JavaPlugin implements Listener, C
         repairGui = new RepairGui(this, economy, prices);
         antiEsp = new AntiEspManager(this);
         antiEsp.setSpawnerSource(spawnerMgr);
+        cmdBlocker = new CommandBlocker(this);
         tpa = new TpaManager(this, combat);
 
         Commands commands = new Commands(economy, points, prices, shopGui, sellGui, auctionGui, orderGui, rtp);
@@ -207,6 +209,7 @@ public final class StructureScoreboard extends JavaPlugin implements Listener, C
         getServer().getPluginManager().registerEvents(specialTools, this);
         getServer().getPluginManager().registerEvents(repairGui, this);
         getServer().getPluginManager().registerEvents(antiEsp, this);
+        getServer().getPluginManager().registerEvents(cmdBlocker, this);
         getServer().getPluginManager().registerEvents(tpa, this);
 
         loadSettings();
@@ -249,6 +252,7 @@ public final class StructureScoreboard extends JavaPlugin implements Listener, C
         specialTools.reload();
         if (repairGui != null) repairGui.reload();
         if (antiEsp != null) antiEsp.reload();
+        cmdBlocker.reload();
         tpa.reload();
 
         title = getConfig().getString("title", "&d&lStructure Smp");
