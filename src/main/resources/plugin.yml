@@ -1,5 +1,5 @@
 name: StructureScoreboard
-version: 1.18.0
+version: 1.19.0
 main: com.structuresmp.scoreboard.StructureScoreboard
 api-version: "1.21"
 description: Scoreboard, economy, shop, auction house, orders and RTP for Structure SMP
@@ -134,6 +134,10 @@ commands:
   tpatoggle:
     description: Turn teleport requests on or off
     usage: /tpatoggle
+
+  pointshop:
+    description: Buy items and enchanted books with points
+    usage: /pointshop
 
 permissions:
   structuresmp.admin:
