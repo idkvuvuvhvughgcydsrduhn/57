@@ -1,5 +1,5 @@
 name: StructureScoreboard
-version: 1.25.1
+version: 1.27.0
 main: com.structuresmp.scoreboard.StructureScoreboard
 api-version: "1.21"
 description: Scoreboard, economy, shop, auction house, orders and RTP for Structure SMP
