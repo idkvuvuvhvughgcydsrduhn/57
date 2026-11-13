@@ -238,6 +238,7 @@ public final class StructureScoreboard extends JavaPlugin implements Listener, C
         getServer().getPluginManager().registerEvents(modCheck, this);
         getServer().getPluginManager().registerEvents(banManager, this);
         getServer().getPluginManager().registerEvents(sellAxe, this);
+        getServer().getPluginManager().registerEvents(rtp, this);
         getServer().getPluginManager().registerEvents(playerSettings, this);
         getServer().getPluginManager().registerEvents(tpa, this);
 
