@@ -73,6 +73,8 @@ public final class StructureScoreboard extends JavaPlugin implements Listener, C
     private AntiEspManager antiEsp;
     private CommandBlocker cmdBlocker;
     private PointShopGui pointShop;
+    private ModCheckManager modCheck;
+    private BanManager banManager;
     private TpaManager tpa;
 
     private BukkitTask task;
@@ -155,6 +157,14 @@ public final class StructureScoreboard extends JavaPlugin implements Listener, C
         antiEsp.setSpawnerSource(spawnerMgr);
         cmdBlocker = new CommandBlocker(this);
         pointShop = new PointShopGui(this, points);
+        modCheck = new ModCheckManager(this);
+        banManager = new BanManager(this);
+        for (String name : new String[] {"ban", "tempban", "ipban", "unban", "banlist", "baninfo"}) {
+            PluginCommand banCommand = getCommand(name);
+            if (banCommand != null) banCommand.setExecutor(banManager);
+        }
+        PluginCommand modCheckCommand = getCommand("modcheck");
+        if (modCheckCommand != null) modCheckCommand.setExecutor(modCheck);
         PluginCommand pointShopCommand = getCommand("pointshop");
         if (pointShopCommand != null) pointShopCommand.setExecutor(pointShop);
         tpa = new TpaManager(this, combat);
@@ -215,13 +225,15 @@ public final class StructureScoreboard extends JavaPlugin implements Listener, C
         getServer().getPluginManager().registerEvents(antiEsp, this);
         getServer().getPluginManager().registerEvents(cmdBlocker, this);
         getServer().getPluginManager().registerEvents(pointShop, this);
+        getServer().getPluginManager().registerEvents(modCheck, this);
+        getServer().getPluginManager().registerEvents(banManager, this);
         getServer().getPluginManager().registerEvents(tpa, this);
 
         loadSettings();
         Bukkit.getScheduler().runTaskTimer(this, () -> {
             economy.save();
             points.save();
-        }, 1200L, 1200L);
+        }, 600L, 600L); // autosave every 30 seconds
     }
 
     @Override
@@ -259,6 +271,7 @@ public final class StructureScoreboard extends JavaPlugin implements Listener, C
         if (antiEsp != null) antiEsp.reload();
         cmdBlocker.reload();
         pointShop.reload();
+        modCheck.reload();
         tpa.reload();
 
         title = getConfig().getString("title", "&d&lStructure Smp");
