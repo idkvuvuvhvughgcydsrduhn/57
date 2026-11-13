@@ -66,21 +66,37 @@ public final class RankManager implements Listener, TabExecutor {
         plugin.getConfig().addDefault(base + "max-homes", maxHomes);
     }
 
+    /** Plain colour codes, no hex and no bold, so every mobile Java client draws the prefix correctly. */
+    private static final Map<String, String> LEGACY_COLORS = Map.of(
+            "owner", "&6", "co-owner", "&e", "admin", "&c", "staff", "&9",
+            "media", "&d", "supporter", "&a", "member", "&7");
+
     public void reload() {
+        // one-time style migration: replace hex colours and bold prefixes with legacy codes
+        var raw = plugin.getConfig();
+        if (raw.getInt("ranks.style-version", 1) < 2) {
+            raw.set("ranks.prefix-format", "%color%[%display%]&r ");
+            for (Map.Entry<String, String> e : LEGACY_COLORS.entrySet()) {
+                raw.set("ranks.list." + e.getKey() + ".color", e.getValue());
+            }
+            raw.set("ranks.style-version", 2);
+            plugin.saveConfig();
+        }
+
         plugin.getConfig().addDefault("ranks.default", "member");
-        plugin.getConfig().addDefault("ranks.prefix-format", "%color%&l[%display%]&r ");
-        defaultRank("owner", "Owner", "&#FFD54A", 100, -1);
-        defaultRank("co-owner", "Co-Owner", "&#FFA726", 90, 30);
-        defaultRank("admin", "Admin", "&#FF5555", 80, 20);
-        defaultRank("staff", "Staff", "&#55AAFF", 60, 12);
-        defaultRank("media", "Media", "&#FF6EC7", 40, 8);
-        defaultRank("supporter", "Supporter", "&#55FFAA", 30, 6);
-        defaultRank("member", "Member", "&#AAAAAA", 10, 3);
+        plugin.getConfig().addDefault("ranks.prefix-format", "%color%[%display%]&r ");
+        defaultRank("owner", "Owner", "&6", 100, -1);
+        defaultRank("co-owner", "Co-Owner", "&e", 90, 30);
+        defaultRank("admin", "Admin", "&c", 80, 20);
+        defaultRank("staff", "Staff", "&9", 60, 12);
+        defaultRank("media", "Media", "&d", 40, 8);
+        defaultRank("supporter", "Supporter", "&a", 30, 6);
+        defaultRank("member", "Member", "&7", 10, 3);
         plugin.getConfig().options().copyDefaults(true);
         plugin.saveConfig();
 
         var cfg = plugin.getConfig();
-        prefixFormat = cfg.getString("ranks.prefix-format", "%color%&l[%display%]&r ");
+        prefixFormat = cfg.getString("ranks.prefix-format", "%color%[%display%]&r ");
 
         List<Rank> loaded = new ArrayList<>();
         ConfigurationSection list = cfg.getConfigurationSection("ranks.list");
