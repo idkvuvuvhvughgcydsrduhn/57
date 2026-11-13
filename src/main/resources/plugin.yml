@@ -1,5 +1,5 @@
 name: StructureScoreboard
-version: 1.19.0
+version: 1.22.0
 main: com.structuresmp.scoreboard.StructureScoreboard
 api-version: "1.21"
 description: Scoreboard, economy, shop, auction house, orders and RTP for Structure SMP
@@ -138,6 +138,29 @@ commands:
   pointshop:
     description: Buy items and enchanted books with points
     usage: /pointshop
+
+  modcheck:
+    description: List the client brand of online players (OP)
+    usage: /modcheck [list|player]
+
+  ban:
+    description: Permanent name ban (OP)
+    usage: /ban <player> [reason]
+  tempban:
+    description: Timed ban (OP)
+    usage: /tempban <player> <time> [reason]
+  ipban:
+    description: Ban the player's last known IP (OP)
+    usage: /ipban <player> [reason]
+  unban:
+    description: Remove bans of a player (OP)
+    usage: /unban <player>
+  banlist:
+    description: List active bans (OP)
+    usage: /banlist
+  baninfo:
+    description: Show the bans of a player (OP)
+    usage: /baninfo <player>
 
 permissions:
   structuresmp.admin:
