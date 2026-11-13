@@ -14,11 +14,13 @@ lines:
   - "&d» &7ปิง: %ping%"
   - "&5&m                    "
 
-# ยศ
+      color: "&c"
+      weight: 48
+      max-homes: 12# ยศ
 ranks:
   default: member
   prefix-format: "%color%&l[%display%]&r "
-  chat-enabled: false
+  chat-enabled: true
   chat-format: "%rank%&f%name%&7: &f%message%"
   list:
     # ===== Staff =====
@@ -95,9 +97,7 @@ ranks:
       max-homes: 12
     youtuber:
       display: YouTuber
-      color: "&c"
-      weight: 48
-      max-homes: 12
+
     tiktoker:
       display: TikToker
       color: "&d"
