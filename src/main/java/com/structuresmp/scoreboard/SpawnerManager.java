@@ -233,10 +233,6 @@ public final class SpawnerManager implements Listener {
         return p.getUniqueId().equals(data.owner) || p.hasPermission("structuresmp.admin");
     }
 
-    public java.util.Collection<SpawnerData> all() {
-        return spawners.values();
-    }
-
     public void touch() {
         dirty = true;
     }
