@@ -10,7 +10,9 @@ import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
+import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
+import org.bukkit.event.player.AsyncPlayerChatEvent;
 import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.plugin.java.JavaPlugin;
@@ -47,6 +49,9 @@ public final class RankManager implements Listener, TabExecutor {
     private final Map<String, Rank> ranks = new LinkedHashMap<>(); // highest weight first
     private String defaultId = "member";
     private String prefixFormat = "%color%&l[%display%]&r ";
+    /** รูปแบบแชท: %rank% = ยศ, %name% = ชื่อผู้เล่น, %message% = ข้อความ */
+    private String chatFormat = "%rank%&f%name%&7: &f%message%";
+    private boolean chatEnabled = true;
     private BukkitTask task;
 
     public RankManager(JavaPlugin plugin, EconomyManager economy) {
@@ -66,37 +71,47 @@ public final class RankManager implements Listener, TabExecutor {
         plugin.getConfig().addDefault(base + "max-homes", maxHomes);
     }
 
-    /** Plain colour codes, no hex and no bold, so every mobile Java client draws the prefix correctly. */
-    private static final Map<String, String> LEGACY_COLORS = Map.of(
-            "owner", "&6", "co-owner", "&e", "admin", "&c", "staff", "&9",
-            "media", "&d", "supporter", "&a", "member", "&7");
-
     public void reload() {
-        // one-time style migration: replace hex colours and bold prefixes with legacy codes
-        var raw = plugin.getConfig();
-        if (raw.getInt("ranks.style-version", 1) < 2) {
-            raw.set("ranks.prefix-format", "%color%[%display%]&r ");
-            for (Map.Entry<String, String> e : LEGACY_COLORS.entrySet()) {
-                raw.set("ranks.list." + e.getKey() + ".color", e.getValue());
-            }
-            raw.set("ranks.style-version", 2);
-            plugin.saveConfig();
-        }
-
         plugin.getConfig().addDefault("ranks.default", "member");
-        plugin.getConfig().addDefault("ranks.prefix-format", "%color%[%display%]&r ");
+        plugin.getConfig().addDefault("ranks.prefix-format", "%color%&l[%display%]&r ");
+        plugin.getConfig().addDefault("ranks.chat-enabled", true);
+        plugin.getConfig().addDefault("ranks.chat-format", "%rank%&f%name%&7: &f%message%");
+        // ใช้สี legacy — เสถียรทั้ง Java/Bedrock
+        // Staff hierarchy
         defaultRank("owner", "Owner", "&6", 100, -1);
-        defaultRank("co-owner", "Co-Owner", "&e", 90, 30);
-        defaultRank("admin", "Admin", "&c", 80, 20);
+        defaultRank("co-owner", "Co-Owner", "&6", 98, 50);
+        defaultRank("manager", "Manager", "&5", 95, 40);
+        defaultRank("head-admin", "Head-Admin", "&c", 92, 35);
+        defaultRank("admin", "Admin", "&c", 88, 30);
+        defaultRank("developer", "Developer", "&b", 85, 30);
+        defaultRank("trial-admin", "Trial-Admin", "&c", 80, 20);
+        defaultRank("moderator", "Moderator", "&2", 75, 18);
+        defaultRank("trial-mod", "Trial-Mod", "&a", 70, 15);
+        defaultRank("helper", "Helper", "&a", 65, 12);
         defaultRank("staff", "Staff", "&9", 60, 12);
-        defaultRank("media", "Media", "&d", 40, 8);
-        defaultRank("supporter", "Supporter", "&a", 30, 6);
+        // Partners / creators
+        defaultRank("partner", "Partner", "&d", 55, 15);
+        defaultRank("famous", "Famous", "&d", 52, 12);
+        defaultRank("streamer", "Streamer", "&5", 50, 12);
+        defaultRank("youtuber", "YouTuber", "&c", 48, 12);
+        defaultRank("tiktoker", "TikToker", "&d", 46, 12);
+        defaultRank("media", "Media", "&d", 44, 10);
+        // Donator ranks
+        defaultRank("titan", "TITAN", "&4", 40, 20);
+        defaultRank("elite", "ELITE", "&b", 36, 16);
+        defaultRank("mvp+", "MVP+", "&6", 32, 14);
+        defaultRank("mvp", "MVP", "&b", 28, 12);
+        defaultRank("vip+", "VIP+", "&a", 24, 10);
+        defaultRank("vip", "VIP", "&a", 20, 8);
+        defaultRank("supporter", "Supporter", "&a", 15, 6);
         defaultRank("member", "Member", "&7", 10, 3);
         plugin.getConfig().options().copyDefaults(true);
         plugin.saveConfig();
 
         var cfg = plugin.getConfig();
-        prefixFormat = cfg.getString("ranks.prefix-format", "%color%[%display%]&r ");
+        prefixFormat = cfg.getString("ranks.prefix-format", "%color%&l[%display%]&r ");
+        chatEnabled = cfg.getBoolean("ranks.chat-enabled", true);
+        chatFormat = cfg.getString("ranks.chat-format", "%rank%&f%name%&7: &f%message%");
 
         List<Rank> loaded = new ArrayList<>();
         ConfigurationSection list = cfg.getConfigurationSection("ranks.list");
@@ -140,14 +155,19 @@ public final class RankManager implements Listener, TabExecutor {
         return rankOf(p.getUniqueId());
     }
 
-    /** Coloured rank name for the scoreboard, e.g. "&#FFD54AOwner". */
+    /** Coloured rank name for the scoreboard, e.g. gold "Owner". */
     public String coloredName(Player p) {
         Rank r = rankOf(p);
-        return r.color() + r.display();
+        return r.color() + "&l" + r.display();
     }
 
     public String prefixOf(Rank r) {
-        return prefixFormat.replace("%color%", r.color()).replace("%display%", r.display());
+        String fmt = prefixFormat;
+        // ถ้า format ไม่มี &l หลังสี ให้ใส่ให้ กันตัวเลขท้าย hex กินชื่อ
+        if (!fmt.contains("%color%&") && !fmt.contains("%color%§")) {
+            fmt = fmt.replace("%color%", "%color%&l");
+        }
+        return fmt.replace("%color%", r.color()).replace("%display%", r.display());
     }
 
     /** How many homes this player may have. */
@@ -200,32 +220,53 @@ public final class RankManager implements Listener, TabExecutor {
             Rank r = rankOf(t);
             String name = teamName(r);
             Team team = sb.getTeam(name);
-            if (team == null) team = sb.registerNewTeam(name);
+            if (team == null) {
+                team = sb.registerNewTeam(name);
+            }
 
             Component prefix = Text.c(prefixOf(r));
-            if (!prefix.equals(team.prefix())) team.prefix(prefix);
+            team.prefix(prefix);
+            team.suffix(Component.empty());
 
             String entry = t.getName();
             Team current = sb.getEntryTeam(entry);
-            if (current != null && current.getName().equals(name)) continue;
+            if (current != null && current.getName().equals(name)) {
+                continue;
+            }
             if (current != null) {
-                if (!current.getName().startsWith("rk")) continue; // belongs to another plugin's team: leave it
+                if (!current.getName().startsWith("rk")) {
+                    continue; // belongs to another plugin's team: leave it
+                }
                 current.removeEntry(entry);
             }
             team.addEntry(entry);
         }
     }
 
-    /** Every viewer (our sidebar board or the main scoreboard) gets the rank teams. */
+    /** ตั้งชื่อใน TAB ให้มียศ (ทำงานทั้ง Java และ Bedrock) */
+    private void applyPlayerListName(Player p) {
+        Rank r = rankOf(p);
+        // [Owner] Name — ใช้ Component ตรง ๆ ไม่ผ่าน legacy ที่พัง hex
+        Component listName = Text.c(prefixOf(r)).append(Component.text(p.getName()));
+        p.playerListName(listName);
+    }
+
+    /** Every viewer gets rank teams + player list names. */
     public void refreshAll() {
         for (Player viewer : Bukkit.getOnlinePlayers()) {
             applyTo(viewer.getScoreboard());
+            applyPlayerListName(viewer);
         }
     }
 
     @EventHandler
     public void onJoin(PlayerJoinEvent e) {
-        Bukkit.getScheduler().runTaskLater(plugin, this::refreshAll, 5L);
+        Player p = e.getPlayer();
+        // หน่วงนิดหน่อยให้ scoreboard ของ sidebar ถูกสร้างก่อน
+        Bukkit.getScheduler().runTaskLater(plugin, () -> {
+            refreshAll();
+            applyPlayerListName(p);
+        }, 5L);
     }
 
     @EventHandler
@@ -235,6 +276,33 @@ public final class RankManager implements Listener, TabExecutor {
             Team team = viewer.getScoreboard().getEntryTeam(entry);
             if (team != null && team.getName().startsWith("rk")) team.removeEntry(entry);
         }
+    }
+
+    // ------------------------------------------------------------------ chat format: [Rank] Name: message
+
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
+    public void onChat(AsyncPlayerChatEvent e) {
+        if (!chatEnabled) return;
+
+        Player p = e.getPlayer();
+        Rank r = rankOf(p);
+        String rankTag = prefixOf(r); // e.g. "&#FFD700&l[Owner]&r "
+
+        // ใช้ Adventure แทน setFormat เพื่อไม่ให้ hex สีพัง (เช่น Owner → 0wner)
+        String raw = chatFormat
+                .replace("%rank%", rankTag)
+                .replace("%name%", p.getName())
+                .replace("%message%", e.getMessage());
+
+        Component message = Text.c(raw);
+        e.setCancelled(true);
+
+        // ส่งให้ทุกคนที่อยู่ใน recipients (รองรับ ignore / vanish ของปลั๊กอินอื่น)
+        for (Player viewer : e.getRecipients()) {
+            viewer.sendMessage(message);
+        }
+        // แสดงใน console ด้วย
+        Bukkit.getConsoleSender().sendMessage(message);
     }
 
     // ------------------------------------------------------------------ commands
