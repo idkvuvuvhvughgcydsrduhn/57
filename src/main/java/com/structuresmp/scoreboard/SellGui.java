@@ -16,7 +16,7 @@ import org.bukkit.plugin.java.JavaPlugin;
 
 import java.util.Map;
 
-/** /sell menu: put items in the top slots, press the green button to sell. */
+/** /sell menu: put items (and shulker boxes) in the top slots, press the green button to sell. */
 public final class SellGui implements Listener {
 
     private static final int SLOTS = 45;   // slots 0-44 hold the items
@@ -52,10 +52,17 @@ public final class SellGui implements Listener {
 
     private void refresh(Inventory inv) {
         double total = 0;
-        int count = 0;
+        long count = 0;
         for (int i = 0; i < SLOTS; i++) {
             ItemStack it = inv.getItem(i);
-            if (it == null || it.getType().isAir() || it.hasItemMeta()) continue;
+            if (it == null || it.getType().isAir()) continue;
+            if (ShulkerSell.isShulker(it)) {
+                ShulkerSell.Sold s = ShulkerSell.peek(it, prices);
+                total += s.total();
+                count += s.count();
+                continue;
+            }
+            if (it.hasItemMeta()) continue;
             double price = prices.sellPrice(it.getType());
             if (price <= 0) continue;
             total += price * it.getAmount();
@@ -64,16 +71,27 @@ public final class SellGui implements Listener {
         inv.setItem(BUTTON, Gui.named(Material.LIME_STAINED_GLASS_PANE, "&a&lขายเลย",
                 "&7ของที่ขายได้: &f" + count + " ชิ้น",
                 "&7ได้เงินรวม: &a$" + Text.money(total),
+                "&8รวมของที่อยู่ในชัลเกอร์บ็อกซ์",
                 " ",
                 "&eคลิกเพื่อขาย"));
     }
 
     private void sell(Player p, Inventory inv) {
         double total = 0;
-        int count = 0;
+        long count = 0;
         for (int i = 0; i < SLOTS; i++) {
             ItemStack it = inv.getItem(i);
-            if (it == null || it.getType().isAir() || it.hasItemMeta()) continue;
+            if (it == null || it.getType().isAir()) continue;
+            if (ShulkerSell.isShulker(it)) {
+                ShulkerSell.Sold s = ShulkerSell.sell(it, prices);
+                if (s.count() > 0) {
+                    inv.setItem(i, it); // write the shulker back with the unsold items
+                    total += s.total();
+                    count += s.count();
+                }
+                continue;
+            }
+            if (it.hasItemMeta()) continue;
             double price = prices.sellPrice(it.getType());
             if (price <= 0) continue;
             total += price * it.getAmount();
@@ -85,6 +103,7 @@ public final class SellGui implements Listener {
             return;
         }
         economy.add(p.getUniqueId(), total);
+        economy.save();
         p.sendMessage(Text.c("&aขายของ &f" + count + " &aชิ้น ได้เงิน &e$" + Text.money(total)));
         refresh(inv);
     }

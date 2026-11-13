@@ -382,6 +382,17 @@ public final class Commands implements TabExecutor {
 
         if (mode.equals("hand")) {
             ItemStack item = inv.getItemInMainHand();
+            if (ShulkerSell.isShulker(item)) {
+                ShulkerSell.Sold s = ShulkerSell.sell(item, prices);
+                if (s.count() == 0) {
+                    p.sendMessage(Text.c("&cไม่มีของที่ขายได้ในชัลเกอร์บ็อกซ์"));
+                    return;
+                }
+                inv.setItemInMainHand(item);
+                economy.add(id, s.total());
+                p.sendMessage(Text.c("&aขายของในชัลเกอร์บ็อกซ์ &f" + s.count() + " &aชิ้น ได้เงิน &e$" + Text.money(s.total())));
+                return;
+            }
             double price = item.getType().isAir() ? 0 : prices.sellPrice(item.getType());
             if (price <= 0 || item.hasItemMeta()) {
                 p.sendMessage(Text.c("&cขายไอเท็มในมือไม่ได้"));
@@ -403,6 +414,12 @@ public final class Commands implements TabExecutor {
             int count = 0;
             for (int i = 0; i < contents.length; i++) {
                 ItemStack item = contents[i];
+                if (ShulkerSell.isShulker(item)) {
+                    ShulkerSell.Sold s = ShulkerSell.sell(item, prices);
+                    total += s.total();
+                    count += s.count();
+                    continue;
+                }
                 if (item == null || item.getType().isAir() || item.hasItemMeta()) continue;
                 double price = prices.sellPrice(item.getType());
                 if (price <= 0) continue;
