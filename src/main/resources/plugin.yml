@@ -1,5 +1,5 @@
 name: StructureScoreboard
-version: 1.22.1
+version: 1.25.1
 main: com.structuresmp.scoreboard.StructureScoreboard
 api-version: "1.21"
 description: Scoreboard, economy, shop, auction house, orders and RTP for Structure SMP
@@ -161,6 +161,14 @@ commands:
   baninfo:
     description: Show the bans of a player (OP)
     usage: /baninfo <player>
+
+  sellaxe:
+    description: Give the Sell Axe (OP)
+    usage: /sellaxe [player]
+
+  settings:
+    description: Personal settings (scoreboard, chat, pay, mobs)
+    usage: /settings
 
 permissions:
   structuresmp.admin:
