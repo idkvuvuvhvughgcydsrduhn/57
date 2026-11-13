@@ -261,11 +261,11 @@ public final class PlayerSettings implements Listener, CommandExecutor {
                 if (mine.size() < MAX_HIDDEN && mine.add(en.getUniqueId())) p.hideEntity(plugin, en);
             }
             Set<UUID> gone = new HashSet<>();
-            for (UUID id : mine) {
-                if (!seen.contains(id)) {
-                    Entity en = Bukkit.getEntity(id);
+            for (UUID eid : mine) {
+                if (!seen.contains(eid)) {
+                    Entity en = Bukkit.getEntity(eid);
                     if (en != null) p.showEntity(plugin, en);
-                    gone.add(id);
+                    gone.add(eid);
                 }
             }
             mine.removeAll(gone);
