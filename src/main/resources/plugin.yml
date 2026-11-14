@@ -1,5 +1,5 @@
 name: StructureScoreboard
-version: 1.32.0
+version: 1.34.0
 main: com.structuresmp.scoreboard.StructureScoreboard
 api-version: "1.21"
 description: Scoreboard, economy, shop, auction house, orders and RTP for Structure SMP
@@ -178,6 +178,10 @@ commands:
     description: Teams with a settings menu
     usage: /team [create|invite|accept|join|leave|kick|disband|chat|info|gui]
     aliases: [party]
+
+  orbitalrod:
+    description: Give an Orbital Rod (explosive fishing rod, OP)
+    usage: /orbitalrod <5|10|15...> [player]
 
 permissions:
   structuresmp.admin:
