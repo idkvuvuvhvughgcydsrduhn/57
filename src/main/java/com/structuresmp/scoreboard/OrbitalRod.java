@@ -52,9 +52,14 @@ public final class OrbitalRod implements Listener, CommandExecutor {
     public void reload() {
         plugin.getConfig().addDefault("orbital.max-range", 50);
         plugin.getConfig().addDefault("orbital.power", 4.0);
-        plugin.getConfig().addDefault("orbital.break-blocks", false);
-        plugin.getConfig().addDefault("orbital.tnt-count", 14);
+        plugin.getConfig().addDefault("orbital.break-blocks", true);
+        plugin.getConfig().addDefault("orbital.rings", 10);
         plugin.getConfig().options().copyDefaults(true);
+        if (plugin.getConfig().getInt("orbital.blocks-version", 1) < 2) {
+            // v2: the strike destroys blocks like the real one
+            plugin.getConfig().set("orbital.break-blocks", true);
+            plugin.getConfig().set("orbital.blocks-version", 2);
+        }
         plugin.saveConfig();
     }
 
@@ -128,35 +133,38 @@ public final class OrbitalRod implements Listener, CommandExecutor {
                 shooter.sendMessage(Text.c("&cจุดตกอยู่ไกลเกินระยะ " + rangeFinal + " บล็อก (" + (int) dist + " บล็อก) ไม่มีการโจมตี"));
                 return;
             }
-            tntRain(shooter, spot);
+            tntRain(shooter, spot, rangeFinal);
         }, 1L, 1L);
     }
 
     // ------------------------------------------------------------------ TNT rain
 
-    /** Rings of TNT fall from the sky onto the spot. Each one explodes where it lands. */
-    private void tntRain(Player shooter, Location spot) {
+    /** Concentric rings of TNT fall from the sky onto the spot (up to 10 rings), then a centre blast. */
+    private void tntRain(Player shooter, Location spot, int range) {
         World w = spot.getWorld();
         if (w == null) return;
         float power = (float) Math.max(0.5, plugin.getConfig().getDouble("orbital.power", 4.0));
-        boolean breakBlocks = plugin.getConfig().getBoolean("orbital.break-blocks", false);
-        int outer = Math.max(4, plugin.getConfig().getInt("orbital.tnt-count", 14));
-        int inner = Math.max(2, outer / 2);
+        boolean breakBlocks = plugin.getConfig().getBoolean("orbital.break-blocks", true);
+        // ring count follows the rod range: 5 blocks = 1 ring, 10 = 2, 25 = 5, 50 = 10 (max 10)
+        int rings = Math.max(1, Math.min(10, range / 5));
+        final int ringGap = 6; // ticks between rings, so each ring hits one after another
 
         w.playSound(spot, Sound.ENTITY_LIGHTNING_BOLT_THUNDER, 2.0f, 0.8f);
         w.playSound(spot, Sound.ENTITY_WITHER_SPAWN, 0.4f, 1.6f);
 
-        int index = 0;
-        for (int i = 0; i < outer; i++) {
-            double a = i * (Math.PI * 2 / outer);
-            spawnFalling(shooter, spot, a, 6.0, index * 2, power, breakBlocks);
-            index++;
+        for (int r = 0; r < rings; r++) {
+            // spacing grows with the range: the outer ring lands at about half the range
+            double spacing = rings > 1 ? Math.max(1.8, (range * 0.5 - 2.5) / (rings - 1)) : 0;
+            double radius = 2.5 + r * spacing;
+            int count = 8 + r;
+            double twist = r * 0.2;
+            for (int i = 0; i < count; i++) {
+                double angle = i * (Math.PI * 2 / count) + twist;
+                spawnFalling(shooter, spot, angle, radius, r * ringGap + (i % 3), power, breakBlocks);
+            }
         }
-        for (int i = 0; i < inner; i++) {
-            double a = i * (Math.PI * 2 / inner) + Math.PI / inner;
-            spawnFalling(shooter, spot, a, 2.8, index * 2 + 10, power, breakBlocks);
-            index++;
-        }
+        // centre blast after the last ring
+        spawnFalling(shooter, spot, 0, 0, rings * ringGap + 8, power, breakBlocks);
     }
 
     private void spawnFalling(Player shooter, Location spot, double angle, double radius, int delay,
