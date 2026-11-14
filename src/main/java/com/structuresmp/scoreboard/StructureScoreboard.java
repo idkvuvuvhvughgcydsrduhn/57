@@ -134,6 +134,7 @@ public final class StructureScoreboard extends JavaPlugin implements Listener, C
         saveConfig();
 
         economy = new EconomyManager(this);
+        PayEffects.init(this);
         points = new PointsManager(this);
         prices = new PriceManager(this);
         auctions = new AuctionManager(this);

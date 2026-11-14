@@ -173,6 +173,7 @@ public final class Commands implements TabExecutor {
         Player receiver = Bukkit.getPlayer(target);
         if (receiver != null) {
             receiver.sendMessage(Text.c("&aคุณได้รับเงิน &e$" + Text.money(amount) + " &aจาก &f" + p.getName()));
+            PayEffects.play(receiver, amount, p.getName());
         }
     }
 
