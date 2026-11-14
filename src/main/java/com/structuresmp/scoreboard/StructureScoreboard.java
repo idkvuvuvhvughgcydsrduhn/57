@@ -77,6 +77,7 @@ public final class StructureScoreboard extends JavaPlugin implements Listener, C
     private BanManager banManager;
     private SellAxe sellAxe;
     private PlayerSettings playerSettings;
+    private LootBoxManager lootBoxes;
     private TpaManager tpa;
 
     private BukkitTask task;
@@ -162,6 +163,9 @@ public final class StructureScoreboard extends JavaPlugin implements Listener, C
         modCheck = new ModCheckManager(this);
         banManager = new BanManager(this);
         sellAxe = new SellAxe(this, economy, prices);
+        lootBoxes = new LootBoxManager(this);
+        PluginCommand lootBoxCommand = getCommand("lootbox");
+        if (lootBoxCommand != null) lootBoxCommand.setExecutor(lootBoxes);
         playerSettings = new PlayerSettings(this, hidden, (p, off) -> {
             if (off) remove(p); else show(p);
         });
@@ -240,6 +244,7 @@ public final class StructureScoreboard extends JavaPlugin implements Listener, C
         getServer().getPluginManager().registerEvents(sellAxe, this);
         getServer().getPluginManager().registerEvents(rtp, this);
         getServer().getPluginManager().registerEvents(playerSettings, this);
+        getServer().getPluginManager().registerEvents(lootBoxes, this);
         getServer().getPluginManager().registerEvents(tpa, this);
 
         loadSettings();
