@@ -1,5 +1,5 @@
 name: StructureScoreboard
-version: 1.29.0
+version: 1.31.0
 main: com.structuresmp.scoreboard.StructureScoreboard
 api-version: "1.21"
 description: Scoreboard, economy, shop, auction house, orders and RTP for Structure SMP
@@ -169,6 +169,10 @@ commands:
   settings:
     description: Personal settings (scoreboard, chat, pay, mobs)
     usage: /settings
+
+  lootbox:
+    description: Mystery boxes (OP)
+    usage: /lootbox create|rename|desc|keyed|delete|list|info|edit|weight|give|givekey
 
 permissions:
   structuresmp.admin:
