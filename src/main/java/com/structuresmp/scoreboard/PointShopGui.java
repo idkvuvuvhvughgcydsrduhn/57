@@ -76,9 +76,9 @@ public final class PointShopGui implements Listener, CommandExecutor {
         plugin.getConfig().addDefault("pointshop.items.BLAZE_ROD", 8);
         plugin.getConfig().addDefault("pointshop.items.SHULKER_SHELL", 200);
         plugin.getConfig().addDefault("pointshop.orbital-rods.5", 2500);
-        plugin.getConfig().addDefault("pointshop.orbital-rods.10", 5000);
-        plugin.getConfig().addDefault("pointshop.orbital-rods.25", 12000);
-        plugin.getConfig().addDefault("pointshop.orbital-rods.50", 25000);
+        plugin.getConfig().addDefault("pointshop.orbital-rods.10", 7500);
+        plugin.getConfig().addDefault("pointshop.orbital-rods.25", 18000);
+        plugin.getConfig().addDefault("pointshop.orbital-rods.50", 37500);
         plugin.getConfig().options().copyDefaults(true);
         plugin.saveConfig();
 
@@ -86,6 +86,14 @@ public final class PointShopGui implements Listener, CommandExecutor {
         enchantBase = Math.max(1, cfg.getLong("pointshop.enchant-base-price", 20));
         enchantMult = Math.max(1.0, cfg.getDouble("pointshop.enchant-level-multiplier", 2.5));
 
+        // one-time price change: 1.5x for ranges above 5 (range 5 stays at 2500)
+        if (cfg.getInt("pointshop.orbital-version", 1) < 2) {
+            cfg.set("pointshop.orbital-rods.10", 7500);
+            cfg.set("pointshop.orbital-rods.25", 18000);
+            cfg.set("pointshop.orbital-rods.50", 37500);
+            cfg.set("pointshop.orbital-version", 2);
+            plugin.saveConfig();
+        }
         orbitalPrices.clear();
         var rods = cfg.getConfigurationSection("pointshop.orbital-rods");
         if (rods != null) {

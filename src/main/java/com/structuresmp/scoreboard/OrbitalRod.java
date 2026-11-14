@@ -10,35 +10,39 @@ import org.bukkit.World;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
+import org.bukkit.entity.BlockDisplay;
+import org.bukkit.entity.FishHook;
 import org.bukkit.entity.Player;
 import org.bukkit.enchantments.Enchantment;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.player.PlayerFishEvent;
+import org.bukkit.inventory.EquipmentSlot;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.plugin.java.JavaPlugin;
+import org.bukkit.scheduler.BukkitTask;
 
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.UUID;
 
 /**
- * Orbital Rod: an explosive fishing rod. Cast it, and when you reel in, the hook spot is struck after
- * one second. The rod has a range (5, 10, 15 ... up to orbital.max-range blocks): the hook must land
- * within that range of you. Admins give rods with /orbitalrod <range> [player].
- * Blocks are not broken unless orbital.break-blocks is true. Kills count for the player who struck.
+ * Orbital Rod: a single-use explosive fishing rod.
+ * Casting it uses the rod up. When the hook lands (or after 3 seconds in the air) a ring of TNT falls from the sky
+ * around the landing spot, one block at a time, and each one explodes where it hits. The landing spot must be within
+ * the rod's range (5, 10, 25 ... blocks). Admins give rods with /orbitalrod <range> [player].
+ * Blocks are only broken when orbital.break-blocks is true. Kills count for the player who fired.
  */
 public final class OrbitalRod implements Listener, CommandExecutor {
 
     private static final String ADMIN = "structuresmp.admin";
     private static final String PURPLE = "&#A855F7";
+    private static final int MAX_FLIGHT_TICKS = 60;   // 3 seconds in the air at most
+    private static final double FALL_SPEED = 1.4;     // blocks per tick
 
     private final JavaPlugin plugin;
     private final NamespacedKey rangeKey;
-    private final Map<UUID, Long> cooldown = new HashMap<>();
 
     public OrbitalRod(JavaPlugin plugin) {
         this.plugin = plugin;
@@ -49,7 +53,7 @@ public final class OrbitalRod implements Listener, CommandExecutor {
         plugin.getConfig().addDefault("orbital.max-range", 50);
         plugin.getConfig().addDefault("orbital.power", 4.0);
         plugin.getConfig().addDefault("orbital.break-blocks", false);
-        plugin.getConfig().addDefault("orbital.cooldown-seconds", 3);
+        plugin.getConfig().addDefault("orbital.tnt-count", 14);
         plugin.getConfig().options().copyDefaults(true);
         plugin.saveConfig();
     }
@@ -65,8 +69,8 @@ public final class OrbitalRod implements Listener, CommandExecutor {
         ItemMeta meta = item.getItemMeta();
         meta.displayName(Text.lore("&#C77DFFOrbital Rod &7(ระยะ " + range + " บล็อก)"));
         meta.lore(List.of(
-                Text.lore("&7คาสต์แล้วรอจุดตกของเบ็ด"),
-                Text.lore("&7ตอนดึงเบ็ด จุดนั้นจะถูกโจมตีด้วยการระเบิด"),
+                Text.lore("&7ใช้ได้ครั้งเดียว เมื่อคาสต์แล้วเบ็ดจะแตกทันที"),
+                Text.lore("&7จุดที่ตกจะถูกถล่มด้วย TNT จากท้องฟ้า"),
                 Text.lore("&7ระยะสูงสุด &f" + range + " &7บล็อก"),
                 Text.lore(" "),
                 Text.lore(PURPLE + "Structure Smp")));
@@ -76,64 +80,118 @@ public final class OrbitalRod implements Listener, CommandExecutor {
         return item;
     }
 
-    /** Range of the orbital rod in this hand, or -1 when the item is not an orbital rod. */
     private int rangeOf(ItemStack item) {
         if (item == null || item.getType() != Material.FISHING_ROD || !item.hasItemMeta()) return -1;
         Integer r = item.getItemMeta().getPersistentDataContainer().get(rangeKey, PersistentDataType.INTEGER);
         return r == null ? -1 : r;
     }
 
-    // ------------------------------------------------------------------ strike
+    // ------------------------------------------------------------------ cast = use the rod up
 
     @EventHandler
-    public void onReel(PlayerFishEvent e) {
-        if (e.getState() != PlayerFishEvent.State.REEL_IN) return;
+    public void onCast(PlayerFishEvent e) {
+        if (e.getState() != PlayerFishEvent.State.FISHING) return;
         Player p = e.getPlayer();
+        EquipmentSlot slot = null;
         int range = rangeOf(p.getInventory().getItemInMainHand());
-        if (range < 0) range = rangeOf(p.getInventory().getItemInOffHand());
+        if (range >= 0) {
+            slot = EquipmentSlot.HAND;
+        } else {
+            range = rangeOf(p.getInventory().getItemInOffHand());
+            if (range >= 0) slot = EquipmentSlot.OFF_HAND;
+        }
         if (range < 0) return;
 
-        Location spot = e.getHook().getLocation().clone();
-        double dist = spot.distance(p.getLocation());
-        if (dist > range) {
-            p.sendMessage(Text.c("&cจุดตกอยู่ไกลเกินระยะ " + range + " บล็อก (" + (int) dist + " บล็อก)"));
-            return;
-        }
+        // the rod breaks as soon as it is cast
+        if (slot == EquipmentSlot.HAND) p.getInventory().setItemInMainHand(null);
+        else p.getInventory().setItemInOffHand(null);
+        p.playSound(p.getLocation(), Sound.ENTITY_ITEM_BREAK, 1.0f, 0.8f);
+        p.sendMessage(Text.c(PURPLE + "Orbital Rod แตกแล้ว รอจุดตกของเบ็ด..."));
 
-        long now = System.currentTimeMillis();
-        long cd = Math.max(0, plugin.getConfig().getLong("orbital.cooldown-seconds", 3)) * 1000L;
-        Long last = cooldown.get(p.getUniqueId());
-        if (last != null && now - last < cd) {
-            p.sendMessage(Text.c("&cรออีก " + ((cd - (now - last)) / 1000 + 1) + " วินาที ก่อนยิงอีกครั้ง"));
-            return;
-        }
-        cooldown.put(p.getUniqueId(), now);
+        FishHook hook = e.getHook();
+        final int rangeFinal = range;
+        final Player shooter = p;
+        final Location[] last = {hook.getLocation().clone()};
+        final int[] ticks = {0};
+        final BukkitTask[] task = new BukkitTask[1];
+        task[0] = Bukkit.getScheduler().runTaskTimer(plugin, () -> {
+            ticks[0]++;
+            if (hook.isValid()) last[0] = hook.getLocation().clone();
+            boolean landed = !hook.isValid() || hook.isOnGround() || ticks[0] >= MAX_FLIGHT_TICKS;
+            if (!landed) return;
+            task[0].cancel();
+            if (!shooter.isOnline()) return;
 
-        p.sendMessage(Text.c(PURPLE + "เรียกการโจมตีที่ " + (int) spot.getX() + ", " + (int) spot.getY()
-                + ", " + (int) spot.getZ()));
-        strike(p, spot);
+            Location spot = last[0];
+            double dist = spot.distance(shooter.getLocation());
+            if (dist > rangeFinal) {
+                shooter.sendMessage(Text.c("&cจุดตกอยู่ไกลเกินระยะ " + rangeFinal + " บล็อก (" + (int) dist + " บล็อก) ไม่มีการโจมตี"));
+                return;
+            }
+            tntRain(shooter, spot);
+        }, 1L, 1L);
     }
 
-    /** Beam from the sky, then the explosion after one second. */
-    private void strike(Player shooter, Location spot) {
+    // ------------------------------------------------------------------ TNT rain
+
+    /** Rings of TNT fall from the sky onto the spot. Each one explodes where it lands. */
+    private void tntRain(Player shooter, Location spot) {
         World w = spot.getWorld();
         if (w == null) return;
         float power = (float) Math.max(0.5, plugin.getConfig().getDouble("orbital.power", 4.0));
         boolean breakBlocks = plugin.getConfig().getBoolean("orbital.break-blocks", false);
-        Location target = spot.clone();
-        Location sky = spot.clone().add(0, 30, 0);
+        int outer = Math.max(4, plugin.getConfig().getInt("orbital.tnt-count", 14));
+        int inner = Math.max(2, outer / 2);
 
-        w.playSound(sky, Sound.ENTITY_LIGHTNING_BOLT_THUNDER, 2.0f, 0.8f);
+        w.playSound(spot, Sound.ENTITY_LIGHTNING_BOLT_THUNDER, 2.0f, 0.8f);
+        w.playSound(spot, Sound.ENTITY_WITHER_SPAWN, 0.4f, 1.6f);
+
+        int index = 0;
+        for (int i = 0; i < outer; i++) {
+            double a = i * (Math.PI * 2 / outer);
+            spawnFalling(shooter, spot, a, 6.0, index * 2, power, breakBlocks);
+            index++;
+        }
+        for (int i = 0; i < inner; i++) {
+            double a = i * (Math.PI * 2 / inner) + Math.PI / inner;
+            spawnFalling(shooter, spot, a, 2.8, index * 2 + 10, power, breakBlocks);
+            index++;
+        }
+    }
+
+    private void spawnFalling(Player shooter, Location spot, double angle, double radius, int delay,
+                              float power, boolean breakBlocks) {
+        World w = spot.getWorld();
+        Location landing = spot.clone().add(Math.cos(angle) * radius, 0, Math.sin(angle) * radius);
+        Location start = landing.clone().add(0, 30, 0);
+
         Bukkit.getScheduler().runTaskLater(plugin, () -> {
-            for (int y = 0; y < 30; y++) {
-                w.spawnParticle(Particle.END_ROD, target.clone().add(0, y, 0), 2, 0.1, 0.1, 0.1, 0.0);
-            }
-            w.spawnParticle(Particle.EXPLOSION_EMITTER, target, 1);
-        }, 10L);
-        Bukkit.getScheduler().runTaskLater(plugin, () -> {
-            if (!w.isChunkLoaded(target.getBlockX() >> 4, target.getBlockZ() >> 4)) return;
-            w.createExplosion(target, power, false, breakBlocks, shooter);
-        }, 20L);
+            BlockDisplay tnt = w.spawn(start, BlockDisplay.class, d -> {
+                d.setBlock(Material.TNT.createBlockData());
+                d.setPersistent(false);
+            });
+            final Location[] pos = {start.clone()};
+            final int[] fall = {0};
+            final BukkitTask[] task = new BukkitTask[1];
+            task[0] = Bukkit.getScheduler().runTaskTimer(plugin, () -> {
+                fall[0]++;
+                pos[0].subtract(0, FALL_SPEED, 0);
+                if (!tnt.isValid()) {
+                    task[0].cancel();
+                    return;
+                }
+                if (pos[0].getY() <= landing.getY() || fall[0] > 60) {
+                    task[0].cancel();
+                    tnt.remove();
+                    if (w.isChunkLoaded(landing.getBlockX() >> 4, landing.getBlockZ() >> 4)) {
+                        w.spawnParticle(Particle.EXPLOSION, landing, 1);
+                        w.createExplosion(landing, power, false, breakBlocks, shooter);
+                    }
+                    return;
+                }
+                tnt.teleport(pos[0]);
+            }, 0L, 1L);
+        }, delay);
     }
 
     // ------------------------------------------------------------------ /orbitalrod
