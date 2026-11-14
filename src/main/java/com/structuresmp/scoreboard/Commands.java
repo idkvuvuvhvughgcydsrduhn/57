@@ -402,6 +402,7 @@ public final class Commands implements TabExecutor {
             int amount = item.getAmount();
             Material m = item.getType();
             inv.setItemInMainHand(new ItemStack(Material.AIR));
+            prices.recordSold(m, amount);
             economy.add(id, total);
             p.sendMessage(Text.c("&aขาย &f" + Text.pretty(m) + " x" + amount
                     + " &aได้เงิน &e$" + Text.money(total)));
@@ -425,6 +426,7 @@ public final class Commands implements TabExecutor {
                 if (price <= 0) continue;
                 total += price * item.getAmount();
                 count += item.getAmount();
+                prices.recordSold(item.getType(), item.getAmount());
                 contents[i] = null;
             }
             if (count == 0) {

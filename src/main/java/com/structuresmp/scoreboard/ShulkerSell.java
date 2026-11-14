@@ -56,6 +56,7 @@ public final class ShulkerSell {
             if (price <= 0) continue;
             total += price * it.getAmount();
             count += it.getAmount();
+            prices.recordSold(it.getType(), it.getAmount());
             contents[i] = null;
         }
         if (count > 0) {

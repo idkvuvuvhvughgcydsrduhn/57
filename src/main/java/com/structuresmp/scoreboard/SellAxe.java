@@ -170,6 +170,7 @@ public final class SellAxe implements Listener, CommandExecutor {
             if (price <= 0) continue;
             total += price * it.getAmount();
             count += it.getAmount();
+            prices.recordSold(it.getType(), it.getAmount());
             contents[i] = null;
         }
         if (count == 0) {

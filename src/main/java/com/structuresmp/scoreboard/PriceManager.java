@@ -1,5 +1,6 @@
 package com.structuresmp.scoreboard;
 
+import org.bukkit.Bukkit;
 import org.bukkit.Material;
 import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.configuration.file.YamlConfiguration;
@@ -17,7 +18,7 @@ import java.util.Map;
 public final class PriceManager {
 
     /** Bump this when the default price list changes; the old prices.yml is then saved as prices-old.yml. */
-    private static final int CATALOG_VERSION = 3;
+    private static final int CATALOG_VERSION = 4;
 
     // ITEM:buy:sell   (buy 0 = not sold in /shop, sell 0 = cannot be sold)
     // Shop order = order of this list. Ores and starter items cost at most 250.
@@ -71,23 +72,79 @@ public final class PriceManager {
             "NETHERITE_LEGGINGS:63000:5600", "NETHERITE_BOOTS:36000:3200", "TURTLE_HELMET:3350:450", "EXPERIENCE_BOTTLE:225:30",
             "ENDER_PEARL:450:70", "BLAZE_ROD:225:35", "FISHING_ROD:180:20", "SHEARS:270:36",
             "FLINT_AND_STEEL:200:27", "COMPASS:785:90", "CLOCK:1350:150", "BREWING_STAND:560:60",
-            "ENCHANTING_TABLE:2700:300", "GOLDEN_APPLE:2250:250", "TOTEM_OF_UNDYING:3000:1", "COAL_BLOCK:0:36",
+            "ENCHANTING_TABLE:2700:300", "GOLDEN_APPLE:2250:250", "TOTEM_OF_UNDYING:1750000:700000", "COAL_BLOCK:0:36",
             "COPPER_BLOCK:0:72", "RAW_COPPER_BLOCK:0:45", "IRON_BLOCK:0:180", "RAW_IRON_BLOCK:0:126",
             "GOLD_BLOCK:0:315", "RAW_GOLD_BLOCK:0:216", "REDSTONE_BLOCK:0:45", "LAPIS_BLOCK:0:45",
             "EMERALD_BLOCK:0:630", "DIAMOND_BLOCK:0:810", "NETHERITE_BLOCK:0:8100", "NETHERITE_INGOT:0:900",
             "ANCIENT_DEBRIS:0:80", "AMETHYST_SHARD:0:40", "ECHO_SHARD:0:3000", "PRISMARINE_SHARD:0:60",
             "PRISMARINE_CRYSTALS:0:80", "PHANTOM_MEMBRANE:0:150", "GHAST_TEAR:0:400", "DRAGON_BREATH:0:1000",
             "NAME_TAG:0:1500", "SADDLE:0:2000", "DISC_FRAGMENT_5:0:2500", "SPONGE:0:3000",
-            "NAUTILUS_SHELL:0:5000", "WITHER_ROSE:0:5000", "DRAGON_EGG:0:500", "ELYTRA:0:18000",
-            "BEACON:0:150000", "NETHER_STAR:0:120000", "ENCHANTED_GOLDEN_APPLE:0:90000", "DRAGON_HEAD:0:50000",
-            "HEAVY_CORE:0:45000", "CONDUIT:0:40000", "HEART_OF_THE_SEA:0:30", "WITHER_SKELETON_SKULL:0:250000",
-            "MUSIC_DISC_PIGSTEP:0:18000", "MUSIC_DISC_OTHERSIDE:0:16000", "MUSIC_DISC_5:0:15000", "MUSIC_DISC_RELIC:0:14000",
-            "MUSIC_DISC_CREATOR:0:13000", "MUSIC_DISC_PRECIPICE:0:12500", "MUSIC_DISC_CREATOR_MUSIC_BOX:0:12000", "SHULKER_BOX:0:1200",
-            "CREEPER_HEAD:0:80000", "PIGLIN_HEAD:0:8000", "MUSIC_DISC_13:0:7000", "MUSIC_DISC_CAT:0:7000",
-            "MUSIC_DISC_BLOCKS:0:7000", "MUSIC_DISC_CHIRP:0:7000", "MUSIC_DISC_FAR:0:7000", "MUSIC_DISC_MALL:0:7000",
-            "MUSIC_DISC_MELLOHI:0:7000", "MUSIC_DISC_STAL:0:7000", "MUSIC_DISC_STRAD:0:7000", "MUSIC_DISC_WARD:0:7000",
-            "MUSIC_DISC_11:0:7000", "MUSIC_DISC_WAIT:0:7000", "SHULKER_SHELL:0:55000", "ZOMBIE_HEAD:0:45000",
-            "SKELETON_SKULL:0:45000", "SNIFFER_EGG:0:30000"
+            "NAUTILUS_SHELL:0:5000", "WITHER_ROSE:0:5000", "DRAGON_EGG:0:5000000", "ELYTRA:0:1800000",
+            "BEACON:0:1500000", "NETHER_STAR:0:1200000", "ENCHANTED_GOLDEN_APPLE:0:900000", "DRAGON_HEAD:0:500000",
+            "HEAVY_CORE:0:450000", "CONDUIT:0:400000", "HEART_OF_THE_SEA:0:300000", "WITHER_SKELETON_SKULL:0:250000",
+            "MUSIC_DISC_PIGSTEP:0:180000", "MUSIC_DISC_OTHERSIDE:0:160000", "MUSIC_DISC_5:0:150000", "MUSIC_DISC_RELIC:0:140000",
+            "MUSIC_DISC_CREATOR:0:130000", "MUSIC_DISC_PRECIPICE:0:125000", "MUSIC_DISC_CREATOR_MUSIC_BOX:0:120000", "SHULKER_BOX:0:120000",
+            "CREEPER_HEAD:0:80000", "PIGLIN_HEAD:0:80000", "MUSIC_DISC_13:0:70000", "MUSIC_DISC_CAT:0:70000",
+            "MUSIC_DISC_BLOCKS:0:70000", "MUSIC_DISC_CHIRP:0:70000", "MUSIC_DISC_FAR:0:70000", "MUSIC_DISC_MALL:0:70000",
+            "MUSIC_DISC_MELLOHI:0:70000", "MUSIC_DISC_STAL:0:70000", "MUSIC_DISC_STRAD:0:70000", "MUSIC_DISC_WARD:0:70000",
+            "MUSIC_DISC_11:0:70000", "MUSIC_DISC_WAIT:0:70000", "SHULKER_SHELL:0:55000", "ZOMBIE_HEAD:0:45000",
+            "SKELETON_SKULL:0:45000", "SNIFFER_EGG:0:30000", "WHITE_WOOL:0:5", "WHITE_CARPET:0:2",
+            "WHITE_CONCRETE:0:6", "WHITE_CONCRETE_POWDER:0:4", "WHITE_TERRACOTTA:0:4", "WHITE_GLAZED_TERRACOTTA:0:12",
+            "WHITE_DYE:0:3", "ORANGE_WOOL:0:5", "ORANGE_CARPET:0:2", "ORANGE_CONCRETE:0:6",
+            "ORANGE_CONCRETE_POWDER:0:4", "ORANGE_TERRACOTTA:0:4", "ORANGE_GLAZED_TERRACOTTA:0:12", "ORANGE_DYE:0:3",
+            "MAGENTA_WOOL:0:5", "MAGENTA_CARPET:0:2", "MAGENTA_CONCRETE:0:6", "MAGENTA_CONCRETE_POWDER:0:4",
+            "MAGENTA_TERRACOTTA:0:4", "MAGENTA_GLAZED_TERRACOTTA:0:12", "MAGENTA_DYE:0:3", "LIGHT_BLUE_WOOL:0:5",
+            "LIGHT_BLUE_CARPET:0:2", "LIGHT_BLUE_CONCRETE:0:6", "LIGHT_BLUE_CONCRETE_POWDER:0:4", "LIGHT_BLUE_TERRACOTTA:0:4",
+            "LIGHT_BLUE_GLAZED_TERRACOTTA:0:12", "LIGHT_BLUE_DYE:0:3", "YELLOW_WOOL:0:5", "YELLOW_CARPET:0:2",
+            "YELLOW_CONCRETE:0:6", "YELLOW_CONCRETE_POWDER:0:4", "YELLOW_TERRACOTTA:0:4", "YELLOW_GLAZED_TERRACOTTA:0:12",
+            "YELLOW_DYE:0:3", "LIME_WOOL:0:5", "LIME_CARPET:0:2", "LIME_CONCRETE:0:6",
+            "LIME_CONCRETE_POWDER:0:4", "LIME_TERRACOTTA:0:4", "LIME_GLAZED_TERRACOTTA:0:12", "LIME_DYE:0:3",
+            "PINK_WOOL:0:5", "PINK_CARPET:0:2", "PINK_CONCRETE:0:6", "PINK_CONCRETE_POWDER:0:4",
+            "PINK_TERRACOTTA:0:4", "PINK_GLAZED_TERRACOTTA:0:12", "PINK_DYE:0:3", "GRAY_WOOL:0:5",
+            "GRAY_CARPET:0:2", "GRAY_CONCRETE:0:6", "GRAY_CONCRETE_POWDER:0:4", "GRAY_TERRACOTTA:0:4",
+            "GRAY_GLAZED_TERRACOTTA:0:12", "GRAY_DYE:0:3", "LIGHT_GRAY_WOOL:0:5", "LIGHT_GRAY_CARPET:0:2",
+            "LIGHT_GRAY_CONCRETE:0:6", "LIGHT_GRAY_CONCRETE_POWDER:0:4", "LIGHT_GRAY_TERRACOTTA:0:4", "LIGHT_GRAY_GLAZED_TERRACOTTA:0:12",
+            "LIGHT_GRAY_DYE:0:3", "CYAN_WOOL:0:5", "CYAN_CARPET:0:2", "CYAN_CONCRETE:0:6",
+            "CYAN_CONCRETE_POWDER:0:4", "CYAN_TERRACOTTA:0:4", "CYAN_GLAZED_TERRACOTTA:0:12", "CYAN_DYE:0:3",
+            "PURPLE_WOOL:0:5", "PURPLE_CARPET:0:2", "PURPLE_CONCRETE:0:6", "PURPLE_CONCRETE_POWDER:0:4",
+            "PURPLE_TERRACOTTA:0:4", "PURPLE_GLAZED_TERRACOTTA:0:12", "PURPLE_DYE:0:3", "BLUE_WOOL:0:5",
+            "BLUE_CARPET:0:2", "BLUE_CONCRETE:0:6", "BLUE_CONCRETE_POWDER:0:4", "BLUE_TERRACOTTA:0:4",
+            "BLUE_GLAZED_TERRACOTTA:0:12", "BLUE_DYE:0:3", "BROWN_WOOL:0:5", "BROWN_CARPET:0:2",
+            "BROWN_CONCRETE:0:6", "BROWN_CONCRETE_POWDER:0:4", "BROWN_TERRACOTTA:0:4", "BROWN_GLAZED_TERRACOTTA:0:12",
+            "BROWN_DYE:0:3", "GREEN_WOOL:0:5", "GREEN_CARPET:0:2", "GREEN_CONCRETE:0:6",
+            "GREEN_CONCRETE_POWDER:0:4", "GREEN_TERRACOTTA:0:4", "GREEN_GLAZED_TERRACOTTA:0:12", "GREEN_DYE:0:3",
+            "RED_WOOL:0:5", "RED_CARPET:0:2", "RED_CONCRETE:0:6", "RED_CONCRETE_POWDER:0:4",
+            "RED_TERRACOTTA:0:4", "RED_GLAZED_TERRACOTTA:0:12", "RED_DYE:0:3", "BLACK_WOOL:0:5",
+            "BLACK_CARPET:0:2", "BLACK_CONCRETE:0:6", "BLACK_CONCRETE_POWDER:0:4", "BLACK_TERRACOTTA:0:4",
+            "BLACK_GLAZED_TERRACOTTA:0:12", "BLACK_DYE:0:3", "POPPY:0:3", "DANDELION:0:3",
+            "BLUE_ORCHID:0:3", "ALLIUM:0:3", "AZURE_BLUET:0:3", "RED_TULIP:0:3",
+            "ORANGE_TULIP:0:3", "WHITE_TULIP:0:3", "PINK_TULIP:0:3", "OXEYE_DAISY:0:3",
+            "CORNFLOWER:0:3", "LILY_OF_THE_VALLEY:0:3", "TORCHFLOWER:0:3", "PINK_PETALS:0:3",
+            "SPORE_BLOSSOM:0:3", "SUNFLOWER:0:3", "LILAC:0:3", "ROSE_BUSH:0:3",
+            "PEONY:0:3", "PITCHER_PLANT:0:3", "FERN:0:3", "LARGE_FERN:0:3",
+            "SHORT_GRASS:0:3", "TALL_GRASS:0:3", "SEA_PICKLE:0:3", "CHORUS_FRUIT:0:3",
+            "CHORUS_FLOWER:0:3", "CHORUS_PLANT:0:3", "STRIPPED_OAK_LOG:0:6", "OAK_WOOD:0:5",
+            "STRIPPED_OAK_WOOD:0:6", "OAK_SLAB:0:1", "OAK_LEAVES:0:1", "OAK_SAPLING:0:3",
+            "STRIPPED_SPRUCE_LOG:0:6", "SPRUCE_WOOD:0:5", "STRIPPED_SPRUCE_WOOD:0:6", "SPRUCE_SLAB:0:1",
+            "SPRUCE_LEAVES:0:1", "SPRUCE_SAPLING:0:3", "STRIPPED_BIRCH_LOG:0:6", "BIRCH_WOOD:0:5",
+            "STRIPPED_BIRCH_WOOD:0:6", "BIRCH_SLAB:0:1", "BIRCH_LEAVES:0:1", "BIRCH_SAPLING:0:3",
+            "STRIPPED_JUNGLE_LOG:0:6", "JUNGLE_WOOD:0:5", "STRIPPED_JUNGLE_WOOD:0:6", "JUNGLE_SLAB:0:1",
+            "JUNGLE_LEAVES:0:1", "JUNGLE_SAPLING:0:3", "STRIPPED_ACACIA_LOG:0:6", "ACACIA_WOOD:0:5",
+            "STRIPPED_ACACIA_WOOD:0:6", "ACACIA_SLAB:0:1", "ACACIA_LEAVES:0:1", "ACACIA_SAPLING:0:3",
+            "STRIPPED_DARK_OAK_LOG:0:6", "DARK_OAK_WOOD:0:5", "STRIPPED_DARK_OAK_WOOD:0:6", "DARK_OAK_SLAB:0:1",
+            "DARK_OAK_LEAVES:0:1", "DARK_OAK_SAPLING:0:3", "STRIPPED_MANGROVE_LOG:0:6", "MANGROVE_WOOD:0:5",
+            "STRIPPED_MANGROVE_WOOD:0:6", "MANGROVE_SLAB:0:1", "MANGROVE_LEAVES:0:1", "STRIPPED_CHERRY_LOG:0:6",
+            "CHERRY_WOOD:0:5", "STRIPPED_CHERRY_WOOD:0:6", "CHERRY_SLAB:0:1", "CHERRY_LEAVES:0:1",
+            "CHERRY_SAPLING:0:3", "STRIPPED_PALE_OAK_LOG:0:6", "PALE_OAK_WOOD:0:5", "STRIPPED_PALE_OAK_WOOD:0:6",
+            "PALE_OAK_SLAB:0:1", "PALE_OAK_LEAVES:0:1", "PALE_OAK_SAPLING:0:3", "RABBIT:0:6",
+            "CHICKEN:0:4", "COD:0:4", "SALMON:0:5", "TROPICAL_FISH:0:4",
+            "PUFFERFISH:0:3", "MUTTON:0:5", "BEEF:0:5", "PORKCHOP:0:5",
+            "CAKE:0:25", "BEETROOT_SOUP:0:6", "RABBIT_STEW:0:15", "SUSPICIOUS_STEW:0:15",
+            "GLOW_INK_SAC:0:8", "HONEYCOMB:0:6", "SLIME_BLOCK:0:40", "DIRT_PATH:0:1",
+            "MUD:0:2", "PACKED_MUD:0:4", "MUD_BRICKS:0:6", "ROOTED_DIRT:0:2",
+            "COARSE_DIRT:0:1", "CLAY:0:4", "TERRACOTTA:0:4", "PRISMARINE:0:10",
+            "DEEPSLATE:0:3", "CALCITE:0:2", "DRIPSTONE_BLOCK:0:2", "MOSS_CARPET:0:2",
+            "VINE:0:2", "SCULK:0:6", "MAGMA_BLOCK:0:8"
     };
 
     private final JavaPlugin plugin;
@@ -95,12 +152,19 @@ public final class PriceManager {
     private final Map<Material, Double> buy = new LinkedHashMap<>();
     private final Map<Material, Double> sell = new HashMap<>();
     private List<Material> buyList = new ArrayList<>();
+
+    /** Market: net items sold (+) or bought (-) recently. The sell price moves against that net amount. */
+    private static final double MARKET_SCALE = 2000.0;   // items that move the price by 100%
+    private static final double MARKET_MIN = 0.5;
+    private static final double MARKET_MAX = 1.5;
+    private final Map<Material, Double> net = new HashMap<>();
     private List<Material> sellList = new ArrayList<>();
 
     public PriceManager(JavaPlugin plugin) {
         this.plugin = plugin;
         this.worthGui = new WorthGui(plugin, this);
         plugin.getServer().getPluginManager().registerEvents(worthGui, plugin);
+        Bukkit.getScheduler().runTaskTimer(plugin, this::decayMarket, 6000L, 6000L);
     }
 
     public WorthGui worthGui() {
@@ -169,8 +233,35 @@ public final class PriceManager {
         return buy.getOrDefault(m, 0.0);
     }
 
-    public double sellPrice(Material m) {
+    /** Base sell price from prices.yml (not affected by the market). */
+    public double basePrice(Material m) {
         return sell.getOrDefault(m, 0.0);
+    }
+
+    /** Current sell price: base price x market factor (0.5 .. 1.5). */
+    public double sellPrice(Material m) {
+        double base = basePrice(m);
+        if (base <= 0) return 0;
+        double factor = 1.0 - net.getOrDefault(m, 0.0) / MARKET_SCALE;
+        return base * Math.max(MARKET_MIN, Math.min(MARKET_MAX, factor));
+    }
+
+    /** Called when a player sells items to the server. */
+    public void recordSold(Material m, long amount) {
+        if (amount <= 0 || basePrice(m) <= 0) return;
+        net.merge(m, (double) amount, Double::sum);
+    }
+
+    /** Called when a player buys items from /shop (buying lowers the net, so the sell price recovers). */
+    public void recordBought(Material m, long amount) {
+        if (amount <= 0 || basePrice(m) <= 0) return;
+        net.merge(m, (double) -amount, Double::sum);
+    }
+
+    /** Every 5 minutes the net drifts back to 0, so prices return to their base over time. */
+    private void decayMarket() {
+        net.replaceAll((m, v) -> v * 0.9);
+        net.values().removeIf(v -> Math.abs(v) < 1.0);
     }
 
     /** Items sold in /shop, in shop order. */

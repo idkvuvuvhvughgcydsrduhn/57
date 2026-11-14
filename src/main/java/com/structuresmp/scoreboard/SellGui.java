@@ -96,6 +96,7 @@ public final class SellGui implements Listener {
             if (price <= 0) continue;
             total += price * it.getAmount();
             count += it.getAmount();
+            prices.recordSold(it.getType(), it.getAmount());
             inv.setItem(i, null);
         }
         if (count == 0) {
