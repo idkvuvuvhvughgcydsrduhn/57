@@ -25,6 +25,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.TreeMap;
 
 /**
  * /pointshop - buy items and enchanted books with points.
@@ -36,13 +37,21 @@ public final class PointShopGui implements Listener, CommandExecutor {
     private static final int PAGE_SIZE = 45;
     private static final String PURPLE = "&#A855F7";
 
-    private enum Screen { MAIN, ITEMS, ENCHANTS, LEVELS }
+    private enum Screen { MAIN, ITEMS, ENCHANTS, LEVELS, ORBITAL }
 
     private final JavaPlugin plugin;
     private final PointsManager points;
     private final Map<Material, Long> itemPrices = new LinkedHashMap<>();
     private final List<Enchantment> enchants = new ArrayList<>();
     private long enchantBase = 20;
+    private OrbitalRod orbital;
+    /** range -> price in points (never below 2500). */
+    private final TreeMap<Integer, Long> orbitalPrices = new TreeMap<>();
+    private static final long ORBITAL_MIN_PRICE = 2500L;
+
+    public void setOrbital(OrbitalRod orbital) {
+        this.orbital = orbital;
+    }
     private double enchantMult = 2.5;
 
     public PointShopGui(JavaPlugin plugin, PointsManager points) {
@@ -66,12 +75,30 @@ public final class PointShopGui implements Listener, CommandExecutor {
         plugin.getConfig().addDefault("pointshop.items.GOLD_INGOT", 4);
         plugin.getConfig().addDefault("pointshop.items.BLAZE_ROD", 8);
         plugin.getConfig().addDefault("pointshop.items.SHULKER_SHELL", 200);
+        plugin.getConfig().addDefault("pointshop.orbital-rods.5", 2500);
+        plugin.getConfig().addDefault("pointshop.orbital-rods.10", 5000);
+        plugin.getConfig().addDefault("pointshop.orbital-rods.25", 12000);
+        plugin.getConfig().addDefault("pointshop.orbital-rods.50", 25000);
         plugin.getConfig().options().copyDefaults(true);
         plugin.saveConfig();
 
         var cfg = plugin.getConfig();
         enchantBase = Math.max(1, cfg.getLong("pointshop.enchant-base-price", 20));
         enchantMult = Math.max(1.0, cfg.getDouble("pointshop.enchant-level-multiplier", 2.5));
+
+        orbitalPrices.clear();
+        var rods = cfg.getConfigurationSection("pointshop.orbital-rods");
+        if (rods != null) {
+            for (String key : rods.getKeys(false)) {
+                try {
+                    int range = Integer.parseInt(key);
+                    if (range < 1) continue;
+                    orbitalPrices.put(range, Math.max(ORBITAL_MIN_PRICE, rods.getLong(key, ORBITAL_MIN_PRICE)));
+                } catch (NumberFormatException ignored) {
+                    // skip bad keys
+                }
+            }
+        }
 
         itemPrices.clear();
         var section = cfg.getConfigurationSection("pointshop.items");
@@ -155,6 +182,8 @@ public final class PointShopGui implements Listener, CommandExecutor {
                         "&7ไอเท็มและวัสดุต่างๆ", " ", "&eคลิกเพื่อเปิด"));
                 inv.setItem(15, named(Material.ENCHANTED_BOOK, "&#C77DFFเอนชานต์",
                         "&7หนังสือเอนชานต์ทุกชนิดและทุกระดับ", " ", "&eคลิกเพื่อเปิด"));
+                inv.setItem(13, named(Material.FISHING_ROD, "&#C77DFFOrbital Rod",
+                        "&7เบ็ดระเบิดตามระยะ (5, 10, 25 ... บล็อก)", " ", "&eคลิกเพื่อเปิด"));
                 inv.setItem(22, named(Material.NETHER_STAR, "&#A855F7พ้อยของคุณ",
                         "&f" + PointsManager.format(points.get(p.getUniqueId())) + " พ้อย"));
             }
@@ -212,6 +241,31 @@ public final class PointShopGui implements Listener, CommandExecutor {
                 inv.setItem(18, named(Material.NETHER_STAR, "&#A855F7พ้อยของคุณ",
                         "&f" + PointsManager.format(points.get(p.getUniqueId()))));
             }
+            case ORBITAL -> {
+                inv = Bukkit.createInventory(holder, 27, Text.c("&8ร้านพ้อย: Orbital Rod"));
+                holder.inventory = inv;
+                ItemStack pane = Gui.named(Material.PURPLE_STAINED_GLASS_PANE, " ");
+                for (int i = 0; i < 27; i++) inv.setItem(i, pane);
+                int slot = 10;
+                for (Map.Entry<Integer, Long> e : orbitalPrices.entrySet()) {
+                    if (slot >= 17 || orbital == null) break;
+                    int range = e.getKey();
+                    holder.levels[slot] = range;
+                    ItemStack rod = orbital.createRod(range);
+                    ItemMeta rm = rod.getItemMeta();
+                    List<net.kyori.adventure.text.Component> lore = new ArrayList<>(rm.lore() == null ? List.of() : rm.lore());
+                    lore.add(Text.lore(" "));
+                    lore.add(Text.lore("&7ราคา: &d" + PointsManager.format(e.getValue()) + " พ้อย"));
+                    lore.add(Text.lore("&eคลิกเพื่อซื้อ"));
+                    rm.lore(lore);
+                    rod.setItemMeta(rm);
+                    inv.setItem(slot, rod);
+                    slot += 2;
+                }
+                inv.setItem(18, named(Material.NETHER_STAR, "&#A855F7พ้อยของคุณ",
+                        "&f" + PointsManager.format(points.get(p.getUniqueId()))));
+                inv.setItem(22, named(Material.BARRIER, "&eกลับ"));
+            }
             default -> {
                 return;
             }
@@ -255,6 +309,24 @@ public final class PointShopGui implements Listener, CommandExecutor {
                 + PointsManager.format(total) + " พ้อย"));
     }
 
+    private void buyOrbital(Player p, int range) {
+        if (orbital == null) {
+            p.sendMessage(Text.c("&cยังไม่พร้อมขาย Orbital Rod"));
+            return;
+        }
+        Long price = orbitalPrices.get(range);
+        if (price == null) return;
+        ItemStack rod = orbital.createRod(range);
+        if (!Gui.canFit(p.getInventory(), rod)) {
+            p.sendMessage(Text.c("&cกระเป๋าเต็ม"));
+            return;
+        }
+        if (!charge(p, price)) return;
+        p.getInventory().addItem(rod);
+        p.sendMessage(Text.c(PURPLE + "ซื้อ &fOrbital Rod ระยะ " + range + " &7ด้วย &d"
+                + PointsManager.format(price) + " พ้อย"));
+    }
+
     private void buyEnchant(Player p, Enchantment e, int level) {
         ItemStack book = enchantBook(e, level);
         if (!Gui.canFit(p.getInventory(), book)) {
@@ -283,6 +355,7 @@ public final class PointShopGui implements Listener, CommandExecutor {
             case MAIN -> {
                 if (raw == 11) Bukkit.getScheduler().runTask(plugin, () -> open(p, Screen.ITEMS, 0, null));
                 else if (raw == 15) Bukkit.getScheduler().runTask(plugin, () -> open(p, Screen.ENCHANTS, 0, null));
+                else if (raw == 13) Bukkit.getScheduler().runTask(plugin, () -> open(p, Screen.ORBITAL, 0, null));
             }
             case ITEMS -> {
                 if ((raw == 45 || raw == 53) && Gui.isArrow(clicked)) {
@@ -323,6 +396,15 @@ public final class PointShopGui implements Listener, CommandExecutor {
                 if (raw >= 27 || holder.levels[raw] == 0 || !e.isLeftClick()) return;
                 buyEnchant(p, holder.enchantTarget, holder.levels[raw]);
                 Bukkit.getScheduler().runTask(plugin, () -> open(p, Screen.LEVELS, 0, holder.enchantTarget));
+            }
+            case ORBITAL -> {
+                if (raw == 22) {
+                    Bukkit.getScheduler().runTask(plugin, () -> open(p, Screen.MAIN, 0, null));
+                    return;
+                }
+                if (raw >= 27 || holder.levels[raw] == 0 || !e.isLeftClick()) return;
+                buyOrbital(p, holder.levels[raw]);
+                Bukkit.getScheduler().runTask(plugin, () -> open(p, Screen.ORBITAL, 0, null));
             }
             default -> {
             }

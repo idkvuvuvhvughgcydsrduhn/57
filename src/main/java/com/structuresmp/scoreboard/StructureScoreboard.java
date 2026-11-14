@@ -79,6 +79,7 @@ public final class StructureScoreboard extends JavaPlugin implements Listener, C
     private PlayerSettings playerSettings;
     private LootBoxManager lootBoxes;
     private TeamManager teams;
+    private OrbitalRod orbitalRod;
     private TpaManager tpa;
 
     private BukkitTask task;
@@ -166,6 +167,10 @@ public final class StructureScoreboard extends JavaPlugin implements Listener, C
         sellAxe = new SellAxe(this, economy, prices);
         lootBoxes = new LootBoxManager(this);
         teams = new TeamManager(this);
+        orbitalRod = new OrbitalRod(this);
+        pointShop.setOrbital(orbitalRod);
+        PluginCommand orbitalCommand = getCommand("orbitalrod");
+        if (orbitalCommand != null) orbitalCommand.setExecutor(orbitalRod);
         for (String name : new String[] {"team"}) {
             PluginCommand teamCommand = getCommand(name);
             if (teamCommand != null) teamCommand.setExecutor(teams);
@@ -252,6 +257,7 @@ public final class StructureScoreboard extends JavaPlugin implements Listener, C
         getServer().getPluginManager().registerEvents(playerSettings, this);
         getServer().getPluginManager().registerEvents(lootBoxes, this);
         getServer().getPluginManager().registerEvents(teams, this);
+        getServer().getPluginManager().registerEvents(orbitalRod, this);
         getServer().getPluginManager().registerEvents(tpa, this);
 
         loadSettings();
@@ -289,6 +295,7 @@ public final class StructureScoreboard extends JavaPlugin implements Listener, C
         specialShop.reload();
         bounty.reload();
         tabList.reload();
+        orbitalRod.reload();
         if (ranks != null) ranks.reload();
         homes.reload();
         specialTools.reload();
